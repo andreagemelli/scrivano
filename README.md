@@ -104,6 +104,12 @@ is tested; JSON isn't guaranteed (10/50 outputs didn't parse strictly — the ap
 from truncated output); a right-looking value in the wrong field isn't flagged. macOS builds are
 unsigned; history is capped at 50 docs storing pages as base64.
 
+## Next Steps
+- [ ] Refine the finetuning with more data
+- [ ] Check multilinguality still holds (italian will remain the central scope though)
+- [ ] Add PII pipeline
+- [ ] Add Document Classification pipeline 
+
 ## Licence
 
 **CC BY-NC-SA 4.0** — see [`LICENSE`](LICENSE), full breakdown in [`NOTICE`](NOTICE). Inherited
