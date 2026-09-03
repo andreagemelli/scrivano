@@ -75,12 +75,13 @@ Measured on the 50-document Italian validation split, greedy decoding.
 
 | Model | Avg F1 | JSON parse failures |
 |---|---|---|
-| `LiquidAI/LFM2.5-350M` (base) | 0.2877 | 6 / 50 |
-| **`andreagemelli/LFM2.5-350M-IT-Extract`** | **0.6639** | 10 / 50 |
-| same, Q4_K_M GGUF | 0.6635 | 10 / 50 |
-| same, Q4_K_M on the app's own OCR text | 0.5662 | 10 / 50 |
+| `LiquidAI/LFM2-350M-Extract` (reference) | 0.2532 | 6 / 50 |
+| `LiquidAI/LFM2.5-350M` (base) | 0.2138 | 0 / 50 |
+| **`andreagemelli/LFM2.5-350M-IT-Extract`** | **0.5311** | 10 / 50 |
+| same, Q4_K_M GGUF | 0.5311 | 10 / 50 |
+| same, Q4_K_M on the app's own OCR text | 0.4362 | 10 / 50 |
 
-Fine-tuning more than doubles F1 (0.29 → 0.66); quantising to Q4_K_M is essentially free; OCR
+Fine-tuning more than doubles F1 (0.21 → 0.53); quantising to Q4_K_M is essentially free; OCR
 costs ~0.10 F1. These are **upper bounds**: the schema is oracle-filtered, parse failures are
 excluded rather than scored zero, and the metric double-counts a wrong value.
 
@@ -107,8 +108,8 @@ unsigned; history is capped at 50 docs storing pages as base64.
 ## Next Steps
 - [ ] Refine the finetuning with more data
 - [ ] Check multilinguality still holds (italian will remain the central scope though)
-- [ ] Add PII pipeline
 - [ ] Add Document Classification pipeline 
+- [ ] Add PII pipeline
 
 ## Licence
 

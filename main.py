@@ -72,7 +72,7 @@ def run_eval(model_id=TUNED_MODEL, limit=None, max_new_tokens=1024, debug=False)
                 print("\n===Error===\n", e)
             errors += 1
 
-    print(f"\nAverage F1 Score: {sum(val_f1) / len(val_f1) if val_f1 else 0:.4f}")
+    print(f"\nAverage F1 Score: {sum(val_f1) / len(documents) if val_f1 else 0:.4f}")
     print(f"Total Errors: {errors} out of {len(documents)} documents.")
 
 
