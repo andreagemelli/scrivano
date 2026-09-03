@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Dichiarazione di residenza - Comune di Castelverde Marittimo</title>
+<style>
+  @page { size: A4; margin: 13mm 14mm; }
+
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body {
+    margin: 0;
+    background: #fdfcf8;
+    color: #14120e;
+    font-family: "Times New Roman", "Liberation Serif", Georgia, serif;
+    font-size: 9.6pt;
+    line-height: 1.32;
+  }
+
+  .page { height: 267mm; position: relative; }
+  .page.first { page-break-after: always; break-after: page; }
+
+  /* ---------- testata ---------- */
+  .testata { display: flex; gap: 6mm; align-items: flex-start; border-bottom: 1.6pt solid #14120e; padding-bottom: 3mm; }
+  .stemma {
+    width: 20mm; height: 24mm; flex: none;
+    border: 0.8pt solid #14120e;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    font-size: 6pt; letter-spacing: 0.06em; color: #5b5648; line-height: 1.4;
+  }
+  .ente { flex: 1; text-align: center; padding-top: 2mm; }
+  .ente .comune { font-size: 15pt; letter-spacing: 0.02em; text-transform: uppercase; font-weight: bold; }
+  .ente .prov { font-size: 9pt; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ente .ufficio { margin-top: 2.6mm; font-size: 8.4pt; letter-spacing: 0.05em; text-transform: uppercase; border-top: 0.5pt solid #8a8474; border-bottom: 0.5pt solid #8a8474; display: inline-block; padding: 0.8mm 4mm; }
+  .ente .recapiti { margin-top: 1.6mm; font-size: 7.4pt; color: #45412f; }
+  .protocollo { width: 34mm; flex: none; border: 0.8pt solid #14120e; padding: 1.6mm 2mm; font-size: 7.4pt; }
+  .protocollo b { display: block; font-size: 6.6pt; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 0.4pt solid #8a8474; margin-bottom: 1.2mm; padding-bottom: 0.6mm; }
+  .protocollo .v { font-family: "Courier New", monospace; font-size: 8pt; }
+
+  h1 { font-size: 12.4pt; text-align: center; letter-spacing: 0.05em; margin: 4mm 0 0.6mm; text-transform: uppercase; }
+  .sottotitolo { text-align: center; font-size: 7.8pt; font-style: italic; color: #45412f; margin-bottom: 3mm; }
+  .destinatario { font-size: 8.6pt; text-align: right; margin: 0 0 3mm; line-height: 1.25; }
+
+  h2 {
+    font-size: 8.4pt; letter-spacing: 0.1em; text-transform: uppercase;
+    background: #e7e3d6; border: 0.5pt solid #14120e;
+    margin: 3.2mm 0 1.6mm; padding: 0.9mm 2mm; font-weight: bold;
+  }
+
+  /* ---------- righe campi ---------- */
+  .riga { display: flex; gap: 3mm; margin-bottom: 2.4mm; }
+  .campo { flex: 1; min-width: 0; }
+  .campo .lab { font-size: 6.6pt; letter-spacing: 0.07em; text-transform: uppercase; color: #45412f; display: block; }
+  .campo .val {
+    display: block; border-bottom: 0.6pt solid #14120e;
+    font-family: "Courier New", monospace; font-size: 9.4pt; letter-spacing: 0.01em;
+    padding: 0.4mm 0.6mm 0.7mm; min-height: 4.4mm; white-space: nowrap; overflow: hidden;
+  }
+  .w-xs { flex: 0 0 16mm; } .w-sm { flex: 0 0 24mm; } .w-md { flex: 0 0 34mm; } .w-lg { flex: 0 0 46mm; }
+
+  /* ---------- caselle ---------- */
+  .box { display: inline-block; width: 3.1mm; height: 3.1mm; border: 0.7pt solid #14120e; margin-right: 1.2mm; vertical-align: -0.3mm; text-align: center; line-height: 2.9mm; font-family: "Courier New", monospace; font-size: 8pt; font-weight: bold; }
+  .opzioni { margin: 0 0 2mm; }
+  .opzioni li { list-style: none; margin-bottom: 1.1mm; }
+  ul.opzioni { margin: 0; padding: 0; }
+  .inline-opts span { margin-right: 7mm; white-space: nowrap; }
+
+  /* ---------- tabella ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  th, td { border: 0.5pt solid #14120e; padding: 1mm 1.4mm; text-align: left; vertical-align: top; }
+  th { background: #e7e3d6; font-size: 6.6pt; letter-spacing: 0.06em; text-transform: uppercase; font-weight: bold; }
+  td.dati { font-family: "Courier New", monospace; font-size: 8.2pt; }
+
+  .legale { font-size: 7.3pt; line-height: 1.42; text-align: justify; margin: 1.6mm 0; }
+  .legale b { letter-spacing: 0.02em; }
+
+  .firma { display: flex; gap: 10mm; margin-top: 7mm; align-items: flex-end; }
+  .firma > div { flex: 1; }
+  .firma .linea { border-bottom: 0.6pt solid #14120e; height: 9mm; }
+  .firma .linea.data { font-family: "Courier New", monospace; font-size: 9.4pt; padding-bottom: 0.8mm; }
+  .firma .cap { font-size: 6.8pt; letter-spacing: 0.06em; text-transform: uppercase; color: #45412f; padding-top: 0.8mm; }
+  .firma .grafia { font-family: "Snell Roundhand", "Apple Chancery", "Zapfino", cursive; font-size: 14pt; padding-bottom: 0.5mm; }
+
+  .riservato { border: 0.8pt solid #14120e; padding: 2mm 2.4mm; margin-top: 5mm; }
+  .riservato .tit { font-size: 6.8pt; letter-spacing: 0.09em; text-transform: uppercase; font-weight: bold; margin-bottom: 1.6mm; }
+
+  .piede { position: absolute; bottom: 0; left: 0; right: 0; border-top: 0.5pt solid #8a8474; padding-top: 1.2mm; font-size: 6.6pt; color: #45412f; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<!-- ===================== PAGINA 1 ===================== -->
+<div class="page first">
+
+  <div class="testata">
+    <div class="stemma">STEMMA<br>DEL<br>COMUNE</div>
+    <div class="ente">
+      <div class="comune">Comune di Castelverde Marittimo</div>
+      <div class="prov">Provincia di Livorno</div>
+      <div class="ufficio">Servizi Demografici &mdash; Ufficio Anagrafe</div>
+      <div class="recapiti">Piazza del Vecchio Faro 3 &middot; 57021 Castelverde Marittimo (LI) &middot; tel. 0586 419200 &middot; anagrafe@comune.castelverdemarittimo.example.it</div>
+    </div>
+    <div class="protocollo">
+      <b>Riservato al protocollo</b>
+      <span class="v">Prot. n. 2024/0004917</span><br>
+      <span class="v">del 12/09/2024</span><br>
+      <span class="v">Cat. XII &mdash; Cl. 3</span><br>
+      <span class="v">Sportello: A2</span>
+    </div>
+  </div>
+
+  <h1>Dichiarazione di residenza</h1>
+  <div class="sottotitolo">resa ai sensi degli artt. 46 e 47 del D.P.R. 28 dicembre 2000, n. 445 &mdash; art. 5 D.L. 9 febbraio 2012, n. 5, conv. L. 4 aprile 2012, n. 35</div>
+
+  <div class="destinatario">Al Sig. Sindaco del Comune di Castelverde Marittimo<br>Ufficio Anagrafe &mdash; Sportello del cittadino</div>
+
+  <h2>Quadro A &mdash; Tipo di dichiarazione</h2>
+  <ul class="opzioni">
+    <li><span class="box">X</span> Dichiarazione di residenza con provenienza da altro comune. Indicare il comune di provenienza: <span style="font-family:'Courier New',monospace">Grosseto (GR)</span></li>
+    <li><span class="box">&nbsp;</span> Dichiarazione di residenza con provenienza dall'estero. Indicare lo Stato estero di provenienza: ..................................</li>
+    <li><span class="box">&nbsp;</span> Dichiarazione di cambiamento di abitazione nell'ambito dello stesso comune</li>
+    <li><span class="box">&nbsp;</span> Iscrizione per altro motivo (specificare): ..............................................................................</li>
+  </ul>
+
+  <h2>Quadro B &mdash; Dati anagrafici del dichiarante</h2>
+
+  <div class="riga">
+    <div class="campo"><span class="lab">Cognome</span><span class="val">GIORDANI</span></div>
+    <div class="campo"><span class="lab">Nome</span><span class="val">ELISA MARTA</span></div>
+    <div class="campo w-xs"><span class="lab">Sesso</span><span class="val">F</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo w-md"><span class="lab">Data di nascita</span><span class="val">14/03/1988</span></div>
+    <div class="campo"><span class="lab">Luogo di nascita</span><span class="val">CASTELVERDE MARITTIMO</span></div>
+    <div class="campo w-xs"><span class="lab">Prov.</span><span class="val">LI</span></div>
+    <div class="campo w-md"><span class="lab">Stato di nascita</span><span class="val">ITALIA</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo w-lg"><span class="lab">Codice fiscale</span><span class="val">GRDLSM88C54M999X</span></div>
+    <div class="campo"><span class="lab">Cittadinanza</span><span class="val">ITALIANA</span></div>
+    <div class="campo w-md"><span class="lab">Stato civile</span><span class="val">CONIUGATA</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo"><span class="lab">Professione</span><span class="val">INSEGNANTE DI SCUOLA PRIMARIA</span></div>
+    <div class="campo w-lg"><span class="lab">Titolo di studio</span><span class="val">LAUREA MAGISTRALE</span></div>
+    <div class="campo w-md"><span class="lab">Patente n.</span><span class="val">LI4192270U</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo w-md"><span class="lab">Telefono</span><span class="val">0586 419227</span></div>
+    <div class="campo w-md"><span class="lab">Cellulare</span><span class="val">340 1184472</span></div>
+    <div class="campo"><span class="lab">Email</span><span class="val">elisa.giordani@example.it</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo"><span class="lab">Posta elettronica certificata (PEC)</span><span class="val">e.giordani@pec.example.it</span></div>
+    <div class="campo w-lg"><span class="lab">Documento di riconoscimento</span><span class="val">C.I. n. CA48127HK</span></div>
+  </div>
+
+  <h2>Quadro C &mdash; Indirizzo di nuova residenza</h2>
+
+  <div class="riga">
+    <div class="campo"><span class="lab">Indirizzo (via, piazza, numero civico, interno)</span><span class="val">VIA DEI TIGLI VECCHI 27/B, INT. 4</span></div>
+    <div class="campo w-sm"><span class="lab">Scala</span><span class="val">B</span></div>
+    <div class="campo w-sm"><span class="lab">Piano</span><span class="val">2</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo"><span class="lab">Comune</span><span class="val">CASTELVERDE MARITTIMO</span></div>
+    <div class="campo w-md"><span class="lab">Provincia</span><span class="val">LIVORNO (LI)</span></div>
+    <div class="campo w-sm"><span class="lab">CAP</span><span class="val">57021</span></div>
+    <div class="campo w-md"><span class="lab">Frazione / Localit&agrave;</span><span class="val">MARINA VECCHIA</span></div>
+  </div>
+
+  <div class="riga">
+    <div class="campo w-md"><span class="lab">Foglio catastale</span><span class="val">42</span></div>
+    <div class="campo w-md"><span class="lab">Particella</span><span class="val">318</span></div>
+    <div class="campo w-sm"><span class="lab">Sub.</span><span class="val">7</span></div>
+    <div class="campo"><span class="lab">Precedente indirizzo di residenza</span><span class="val">VIA CARLO ADRIANI 8, GROSSETO (GR)</span></div>
+  </div>
+
+  <div style="margin-top:2mm">Titolo di occupazione dell'alloggio (art. 5 D.L. 47/2014):</div>
+  <ul class="opzioni">
+    <li><span class="box">X</span> locazione &mdash; contratto registrato presso l'Agenzia delle Entrate n. <span style="font-family:'Courier New',monospace">TL/2024/0091447</span> del <span style="font-family:'Courier New',monospace">02/09/2024</span></li>
+    <li><span class="box">&nbsp;</span> propriet&agrave; &nbsp;&nbsp;&nbsp; <span class="box">&nbsp;</span> usufrutto &nbsp;&nbsp;&nbsp; <span class="box">&nbsp;</span> comodato d'uso &nbsp;&nbsp;&nbsp; <span class="box">&nbsp;</span> altro titolo (specificare): ......................................................</li>
+  </ul>
+
+  <h2>Quadro C-bis &mdash; Annotazioni del dichiarante</h2>
+  <div class="riga">
+    <div class="campo"><span class="lab">Note</span><span class="val">TRASFERIMENTO PER MOTIVI DI LAVORO &mdash; SEDE DI SERVIZIO I.C. &quot;A. NEGRI&quot;</span></div>
+  </div>
+  <div class="riga">
+    <div class="campo w-lg"><span class="lab">Data trasferimento</span><span class="val">09/09/2024</span></div>
+    <div class="campo"><span class="lab">Recapito alternativo per comunicazioni</span><span class="val">VIA CARLO ADRIANI 8, 58100 GROSSETO (GR)</span></div>
+  </div>
+
+  <div class="piede">
+    <span>Mod. ANA/03 &mdash; rev. 02/2024</span>
+    <span>Comune di Castelverde Marittimo &mdash; Servizi Demografici</span>
+    <span>Pagina 1 di 2</span>
+  </div>
+</div>
+
+<!-- ===================== PAGINA 2 ===================== -->
+<div class="page">
+
+  <div style="display:flex;justify-content:space-between;border-bottom:0.8pt solid #14120e;padding-bottom:1.4mm;font-size:7.6pt;letter-spacing:0.05em;text-transform:uppercase">
+    <span>Comune di Castelverde Marittimo &mdash; Dichiarazione di residenza</span>
+    <span>Prot. n. 2024/0004917 del 12/09/2024</span>
+  </div>
+
+  <h2>Quadro D &mdash; Altre persone che trasferiscono la residenza</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:5%">N.</th>
+        <th style="width:19%">Cognome</th>
+        <th style="width:16%">Nome</th>
+        <th style="width:13%">Data di nascita</th>
+        <th style="width:19%">Luogo di nascita</th>
+        <th style="width:19%">Codice fiscale</th>
+        <th style="width:9%">Rapporto di parentela</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="dati">1</td><td class="dati">VENTURELLI</td><td class="dati">PAOLO</td><td class="dati">02/11/1985</td><td class="dati">Grosseto (GR)</td><td class="dati">VNTPLA85S02E202R</td><td class="dati">coniuge</td></tr>
+      <tr><td class="dati">2</td><td class="dati">VENTURELLI</td><td class="dati">GIULIA</td><td class="dati">27/06/2016</td><td class="dati">Grosseto (GR)</td><td class="dati">VNTGLI16H67E202D</td><td class="dati">figlia</td></tr>
+      <tr><td class="dati">3</td><td class="dati">&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td class="dati">4</td><td class="dati">&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Quadro E &mdash; Famiglia gi&agrave; residente all'indirizzo indicato</h2>
+  <div class="inline-opts" style="margin-bottom:1.6mm">
+    <span><span class="box">&nbsp;</span> S&igrave;, con i seguenti rapporti</span>
+    <span><span class="box">X</span> No, nessun rapporto</span>
+  </div>
+  <div class="riga">
+    <div class="campo"><span class="lab">Cognome e nome dell'intestatario della scheda di famiglia gi&agrave; residente</span><span class="val">&nbsp;</span></div>
+    <div class="campo w-lg"><span class="lab">Rapporto di parentela</span><span class="val">&nbsp;</span></div>
+  </div>
+
+  <h2>Quadro F &mdash; Patenti e veicoli immatricolati in Italia</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:26%">Intestatario</th>
+        <th style="width:20%">Patente n.</th>
+        <th style="width:18%">Targa veicolo</th>
+        <th style="width:18%">Targa rimorchio</th>
+        <th style="width:18%">Tipo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="dati">GIORDANI ELISA MARTA</td><td class="dati">LI4192270U</td><td class="dati">GH 419 KT</td><td class="dati">&mdash;</td><td class="dati">autovettura</td></tr>
+      <tr><td class="dati">VENTURELLI PAOLO</td><td class="dati">GR3308561B</td><td class="dati">FT 772 PN</td><td class="dati">&mdash;</td><td class="dati">motociclo</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Quadro G &mdash; Dichiarazioni ai sensi del D.P.R. 445/2000</h2>
+  <p class="legale">
+    Il/la sottoscritto/a, consapevole delle responsabilit&agrave; penali cui pu&ograve; andare incontro in caso di dichiarazioni non veritiere,
+    di formazione o uso di atti falsi, richiamate dall'<b>art. 76 del D.P.R. 28 dicembre 2000, n. 445</b>, nonch&eacute; della decadenza
+    dai benefici eventualmente conseguenti al provvedimento emanato sulla base della dichiarazione non veritiera, prevista
+    dall'<b>art. 75</b> del medesimo decreto, <b>dichiara</b> sotto la propria responsabilit&agrave;, ai sensi degli <b>artt. 46 e 47</b> del citato decreto,
+    che quanto sopra riportato corrisponde al vero e che sussistono i requisiti per l'iscrizione anagrafica richiesta.
+    Dichiara altres&igrave; di essere a conoscenza che, ai sensi dell'art. 5 del D.L. 9 febbraio 2012, n. 5, convertito con modificazioni
+    dalla L. 4 aprile 2012, n. 35, gli effetti giuridici della presente dichiarazione decorrono dalla data di presentazione e che,
+    entro i successivi quarantacinque giorni, il Comune procede all'accertamento dei requisiti dichiarati; trascorso tale termine
+    senza comunicazione di preavviso di rigetto ai sensi dell'art. 10-bis della L. 7 agosto 1990, n. 241, l'iscrizione si intende
+    confermata. In caso di accertamento negativo si applicano gli artt. 75 e 76 del D.P.R. 445/2000, con ripristino della
+    posizione anagrafica precedente e segnalazione all'autorit&agrave; giudiziaria.
+  </p>
+  <ul class="opzioni">
+    <li><span class="box">X</span> Dichiara di aver preso visione dell'informativa sul trattamento dei dati personali resa ai sensi dell'art. 13 del Regolamento (UE) 2016/679.</li>
+    <li><span class="box">X</span> Allega copia fotostatica non autenticata del proprio documento di riconoscimento in corso di validit&agrave;, ai sensi dell'art. 38 del D.P.R. 445/2000.</li>
+    <li><span class="box">&nbsp;</span> Chiede che le comunicazioni relative al presente procedimento siano inviate all'indirizzo di posta elettronica sopra indicato.</li>
+  </ul>
+
+  <div class="firma">
+    <div style="flex:0 0 60mm">
+      <div class="linea data">Castelverde Marittimo, 12/09/2024</div>
+      <div class="cap">Luogo e data</div>
+    </div>
+    <div>
+      <div class="linea" style="text-align:center"><span class="grafia">E. M. Giordani</span></div>
+      <div class="cap" style="text-align:center">Firma del dichiarante</div>
+    </div>
+  </div>
+
+  <div class="riservato">
+    <div class="tit">Spazio riservato all'ufficio anagrafe</div>
+    <div class="riga" style="margin-bottom:1.6mm">
+      <div class="campo w-md"><span class="lab">Ricevuta il</span><span class="val">12/09/2024</span></div>
+      <div class="campo w-md"><span class="lab">Modalit&agrave; di presentazione</span><span class="val">SPORTELLO</span></div>
+      <div class="campo"><span class="lab">Operatore ricevente</span><span class="val">L. BENCINI &mdash; MATR. 0417</span></div>
+      <div class="campo w-md"><span class="lab">Esito accertamento</span><span class="val">&nbsp;</span></div>
+    </div>
+    <div class="inline-opts" style="font-size:7.6pt">
+      <span><span class="box">X</span> documento allegato</span>
+      <span><span class="box">X</span> titolo di occupazione verificato</span>
+      <span><span class="box">&nbsp;</span> accertamento Polizia Municipale richiesto</span>
+      <span><span class="box">&nbsp;</span> pratica sospesa</span>
+    </div>
+    <div style="margin-top:4mm;display:flex;gap:10mm">
+      <div style="flex:1;border-bottom:0.6pt solid #14120e;height:7mm"></div>
+      <div style="flex:1;border-bottom:0.6pt solid #14120e;height:7mm"></div>
+    </div>
+    <div style="display:flex;gap:10mm;font-size:6.8pt;letter-spacing:0.06em;text-transform:uppercase;color:#45412f;padding-top:0.8mm">
+      <div style="flex:1">Timbro dell'ufficio</div>
+      <div style="flex:1">Il responsabile del procedimento</div>
+    </div>
+  </div>
+
+  <div class="piede">
+    <span>Mod. ANA/03 &mdash; rev. 02/2024</span>
+    <span>Comune di Castelverde Marittimo &mdash; Servizi Demografici</span>
+    <span>Pagina 2 di 2</span>
+  </div>
+</div>
+
+</body>
+</html>

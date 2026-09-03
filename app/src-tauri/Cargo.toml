@@ -1,0 +1,40 @@
+[package]
+name = "app"
+version = "0.1.0"
+description = "Estrazione di dati dai moduli italiani, in locale"
+authors = ["Andrea Gemelli"]
+license = "CC-BY-NC-SA-4.0"
+repository = "https://github.com/andreagemelli/scrivano"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Must match tauri.conf.json mainBinaryName.
+[[bin]]
+name = "scrivano"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+anyhow = "1.0"
+encoding_rs = "0.8"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tiff"] }
+llama-cpp-2 = "0.1.156"
+oar-ocr = "0.9.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+
+# The model and the ONNX graphs are unusably slow in a debug build, and cargo
+# does not apply [profile] from a workspace member, so set it here.
+[profile.dev.package."*"]
+opt-level = 3

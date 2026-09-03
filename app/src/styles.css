@@ -1,0 +1,872 @@
+/* Scrivano. One blue accent, soft rounded surfaces, sans everywhere except
+   the three places that carry literal document data: the JSON output, the
+   extracted values and the OCR text. Light is the base, dark is the override. */
+:root {
+  color-scheme: light;
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --ink: #101828;
+  --ink-2: #475467;
+  --ink-3: #667085;
+  --line: #e3e8ef;
+  --line-2: #cfd6e0;
+
+  --accent: #1d4ed8;
+  --accent-hover: #1b45bd;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(29, 78, 216, 0.08);
+  --accent-edge: rgba(29, 78, 216, 0.28);
+
+  --amber: #92400e;
+  --amber-soft: rgba(217, 119, 6, 0.12);
+  --amber-edge: rgba(217, 119, 6, 0.34);
+  --hit: rgba(29, 78, 216, 0.2);
+
+  --red: #b42318;
+  --red-soft: rgba(180, 35, 24, 0.07);
+  --red-edge: rgba(180, 35, 24, 0.24);
+
+  --shadow: 0 1px 2px rgba(16, 40, 90, 0.05), 0 10px 26px -18px rgba(16, 40, 90, 0.45);
+  --shadow-lift: 0 2px 6px rgba(16, 40, 90, 0.12);
+  --shadow-drawer: -24px 0 60px -30px rgba(16, 40, 90, 0.6);
+  --scrim: rgba(16, 24, 40, 0.32);
+
+  --r-panel: 10px;
+  --r-ctl: 8px;
+  --r-inner: 6px;
+  --r-pill: 999px;
+
+  /* Four steps, and only four: meta, body, panel title, screen title. */
+  --t-meta: 12px;
+  --t-body: 13px;
+  --t-title: 15px;
+  --t-lead: 18px;
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0e1218;
+    --surface: #171c24;
+    --surface-2: #1d232c;
+    --ink: #e8ecf3;
+    --ink-2: #aab4c3;
+    --ink-3: #8b97a8;
+    --line: #303845;
+    --line-2: #333c49;
+
+    --accent: #7aa2ff;
+    --accent-hover: #93b4ff;
+    --accent-ink: #0b1020;
+    --accent-soft: rgba(122, 162, 255, 0.13);
+    --accent-edge: rgba(122, 162, 255, 0.4);
+
+    --amber: #f0b357;
+    --amber-soft: rgba(240, 179, 87, 0.14);
+    --amber-edge: rgba(240, 179, 87, 0.34);
+    --hit: rgba(122, 162, 255, 0.26);
+
+    --red: #ff8a7d;
+    --red-soft: rgba(255, 138, 125, 0.1);
+    --red-edge: rgba(255, 138, 125, 0.3);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -20px rgba(0, 0, 0, 0.9);
+    --shadow-lift: 0 2px 8px rgba(0, 0, 0, 0.5);
+    --shadow-drawer: -24px 0 60px -30px rgba(0, 0, 0, 0.85);
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--t-body)/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-inner);
+}
+
+::selection { background: var(--accent-soft); }
+
+/* Scrollbars, quiet but always visible so a cut list looks cut. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--line-2);
+  background-clip: content-box;
+}
+
+.grow { flex: 1 1 auto; min-width: 0; }
+
+/* Shell. A flex column, so every row is sized by its content and the workspace
+   takes the rest: no empty grid track can open up under the panes. */
+.app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Windows and Linux draw their own title bar, so the app name starts at the
+     edge there. Only macOS, where the window is ours, needs a gutter. */
+  padding: 0 14px;
+  height: 54px;
+}
+/* 78px keeps the macOS traffic lights clear of the app name. */
+[data-os="macos"] .topbar { padding-left: 78px; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--t-title);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  flex: none;
+}
+/* An alpha mask painted with the accent, not an <img>: the source mark is one
+   blue on a light tile, which vanishes against the dark theme's surface. */
+.brand .logo {
+  flex: none;
+  display: block;
+  background: var(--accent);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* One fine-tune on 149 documents: the badge is part of the name, not a boast. */
+.beta {
+  padding: 1px 6px;
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Drawer tab bar: the schema and the model are two screens, not two sections
+   of one long scroll, so the switch sits above the scrolling body. */
+.drawer-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.drawer-tabs .muted { font-size: var(--t-meta); }
+
+/* Decode rate, in the extraction panel header. Mono so the number does not
+   shuffle the row every time a digit changes width. */
+.speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-meta);
+  font-variant-numeric: tabular-nums;
+}
+.speed.live { color: var(--accent); background: var(--accent-soft); }
+.topbar-doc {
+  min-width: 0;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-body);
+  color: var(--ink-2);
+}
+.reason {
+  max-width: 32ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-meta);
+  color: var(--ink-2);
+}
+
+.banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--red-edge);
+  border-radius: var(--r-panel);
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--t-body);
+}
+.banner .icon-btn { color: var(--red); }
+
+.workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 12px 14px 14px;
+}
+
+/* Left rail */
+.rail {
+  flex: none;
+  width: 240px;
+  margin-right: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.rail.collapsed { width: 56px; }
+.rail-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+.rail.collapsed .rail-top { justify-content: center; padding: 0; }
+.rail-count { font-size: var(--t-meta); color: var(--ink-2); }
+.rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rail.collapsed .rail-list { align-items: center; padding: 8px 0; }
+.rail-foot {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+}
+.rail.collapsed .rail-foot { padding: 8px 0; }
+/* Round, centred and pinned to the floor in both rail states. Tinted rather
+   than filled: the filled accent belongs to Extract, the primary action. */
+.fab {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--accent-edge);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+.fab:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.doc-card {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-ctl);
+}
+.doc-card:hover { background: var(--surface-2); }
+.doc-card.active { background: var(--accent-soft); border-color: var(--accent-edge); }
+.doc-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 2px 8px 10px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.doc-name {
+  display: block;
+  font-size: var(--t-body);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: var(--t-meta);
+  color: var(--ink-2);
+}
+/* Resting at half strength rather than hidden: a delete you can only find by
+   hovering does not exist on a touch screen. */
+.doc-del { flex: none; margin-right: 4px; opacity: 0.55; }
+.doc-card:hover .doc-del, .doc-del:focus-visible { opacity: 1; }
+
+.doc-mini {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.doc-mini { font-size: var(--t-meta); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.doc-mini:hover { background: var(--surface-2); color: var(--ink); }
+.doc-mini.active { background: var(--accent-soft); border-color: var(--accent-edge); color: var(--accent); }
+.doc-mini .warn { position: absolute; top: 3px; right: 3px; color: var(--red); }
+.doc-mini .dot { position: absolute; top: 5px; right: 5px; }
+
+/* Stage: source on the left, output on the right, flow arrow between them. */
+.stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr 28px 1fr;
+}
+/* Held at the height of the two panel headers, so it points from one title to
+   the other instead of floating in the middle of the page. */
+.flow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14px;
+  color: var(--ink-3);
+  opacity: 0.7;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 10px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.panel-head h2 { margin: 0; font-size: var(--t-title); font-weight: 600; }
+.panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px; }
+.panel-foot {
+  flex: none;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* Shared small type */
+.muted { font-size: var(--t-meta); color: var(--ink-2); white-space: nowrap; }
+/* A "?" carrying its sentence in `title`, instead of a paragraph that sits on
+   screen whether or not anyone reads it twice. */
+.help { display: inline-flex; flex: none; color: var(--ink-3); cursor: help; }
+.help:hover { color: var(--ink-2); }
+.hint { margin: 0 0 10px; font-size: var(--t-meta); color: var(--ink-2); }
+.err {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--red-edge);
+  border-radius: var(--r-ctl);
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: var(--t-body);
+  white-space: pre-wrap;
+}
+.err-text { font-size: var(--t-meta); color: var(--red); }
+.tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: var(--t-meta);
+  color: var(--ink-2);
+}
+/* Amber, and always with words: a coloured mark alone is a state nobody reads. */
+.flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-family: var(--sans);
+  font-size: var(--t-meta);
+  white-space: nowrap;
+}
+
+/* Flat and borderless with a leading dot: nothing here should read as pressable. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  font-size: var(--t-meta);
+  color: var(--ink-2);
+}
+.pill.status-reading, .pill.status-extracting { color: var(--accent); }
+.pill.status-failed { color: var(--red); }
+.dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.dot.busy { background: var(--accent); }
+.dot.failed { background: var(--red); }
+
+/* Controls */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--ink-3); }
+.btn:disabled { background: var(--surface-2); border-color: var(--line); color: var(--ink-3); cursor: not-allowed; }
+.btn > svg:only-child { margin: 0 -3px; }
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-lift);
+}
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.primary:disabled { background: var(--surface-2); border-color: var(--line); color: var(--ink-3); box-shadow: none; }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.icon-btn:disabled { color: var(--ink-3); background: transparent; cursor: not-allowed; }
+
+/* A count that is also the way in to the schema. */
+.link-btn {
+  flex: none;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  font-size: var(--t-meta);
+  color: var(--ink-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.link-btn:hover { background: var(--surface-2); color: var(--ink); }
+
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  flex: none;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+.seg button {
+  min-height: 24px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  font-size: var(--t-body);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Document pane */
+.doc-pane .panel-body.drag-ring {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: var(--accent-soft);
+}
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 100%;
+  min-height: 240px;
+  padding: 24px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-panel);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  text-align: center;
+}
+.drop-zone .lead { max-width: 30ch; margin: 0; font-size: var(--t-title); color: var(--ink-2); }
+.drop-zone .note { margin: 0; font-size: var(--t-meta); color: var(--ink-3); }
+.doc-pane.dragging .drop-zone { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+
+.pages { display: flex; flex-direction: column; gap: 16px; }
+.page { display: flex; flex-direction: column; gap: 6px; }
+.page-num { display: flex; align-items: center; font-size: var(--t-meta); color: var(--ink-2); }
+.page-img {
+  display: block;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+}
+/* Sized by the image itself, so the overlay is exactly the picture. Percentage
+   geometry means it stays right at any width, with no resize listener. */
+.shot { position: relative; width: fit-content; max-width: 100%; }
+/* Inset by the image border, so a rect lands on the pixels and not the frame. */
+.marks { position: absolute; inset: 1px; pointer-events: none; }
+.mark {
+  position: absolute;
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  background: var(--hit);
+}
+.text-block + .text-block { margin-top: 20px; }
+.text-block .page-num { margin-bottom: 8px; }
+.line { display: flex; gap: 10px; }
+.ln { flex: none; width: 28px; text-align: right; font-size: var(--t-meta); line-height: 1.75; color: var(--ink-3); user-select: none; }
+.line-text {
+  font-family: var(--mono);
+  font-size: var(--t-meta);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.hit { background: var(--hit); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+.skel-page { height: 55vh; border-radius: var(--r-ctl); background: var(--surface-2); }
+.skel-line { height: 10px; margin-top: 10px; border-radius: var(--r-pill); background: var(--surface-2); }
+
+/* Extraction pane. The JSON is the document here, so it is the only place in
+   the app that is set in mono besides the OCR text. */
+/* One horizontal scroller for the whole block: a value that runs long scrolls
+   rather than wrapping, so the output never looks like malformed JSON. */
+.jsondoc { font-family: var(--mono); font-size: var(--t-body); line-height: 1.7; overflow-x: auto; }
+.brace { color: var(--ink-3); }
+.jrow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  column-gap: 0;
+  margin: 1px 0;
+  padding: 2px 8px 2px 20px;
+  border-radius: var(--r-ctl);
+}
+.jrow:hover { background: var(--accent-soft); }
+.jkey { color: var(--accent); font-weight: 500; }
+.jpunct, .jquote { color: var(--ink-3); }
+/* Flex items eat trailing whitespace, so the space after the colon is drawn. */
+.jkey + .jpunct { margin-right: 0.6ch; }
+/* Editable at rest, not only on hover: an input that looks like static text is
+   an affordance nobody finds. 24px tall so it is a real target. */
+.jval {
+  min-width: 4ch;
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: var(--t-body);
+  color: var(--ink);
+}
+.jval:hover { border-color: var(--line-2); }
+.jval:focus { border-color: var(--accent); background: var(--surface); outline: none; }
+.jrow .flag { margin-left: 8px; }
+
+/* Fields view: the same values without the punctuation. Labels are sans, only
+   the values are mono, because only the values are document data. */
+.fieldsview { display: flex; flex-direction: column; gap: 2px; }
+.frow {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: var(--r-ctl);
+}
+.frow:hover { background: var(--accent-soft); }
+.flabel { font-size: var(--t-meta); color: var(--ink-2); overflow-wrap: anywhere; }
+.fvalue { width: 100%; }
+.frow .flag { grid-column: 2; justify-self: start; }
+
+/* Nothing came back for these keys. A different thing from the amber flag on a
+   value that is not on the page, so it is a section, not a chip. */
+.nofound {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--amber-edge);
+  border-radius: var(--r-ctl);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.nofound h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+.nofound p { margin: 2px 0 0; font-size: var(--t-meta); }
+.nofound ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nofound li {
+  padding: 1px 8px;
+  border: 1px solid var(--amber-edge);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--t-meta);
+  user-select: text;
+}
+
+/* What Extract will produce, drawn from the schema, so the panel is never a
+   blank surface and the schema is visible without opening the drawer. */
+.preview { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: var(--t-body); line-height: 1.7; }
+.preview .brace { padding: 0; }
+.preview-row { display: flex; gap: 0; padding: 2px 8px 2px 20px; color: var(--ink-3); }
+.preview-row .jkey { color: var(--ink-3); font-weight: 400; }
+
+.raw {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: var(--t-meta);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  vertical-align: -2px;
+  background: var(--accent);
+}
+
+/* Settings drawer */
+.scrim { position: fixed; inset: 0; z-index: 10; background: var(--scrim); }
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 94vw);
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: var(--r-panel) 0 0 var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-drawer);
+}
+.drawer-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 10px 0 16px;
+}
+.drawer-head h2 { margin: 0; font-size: var(--t-lead); font-weight: 600; }
+.drawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.group { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.group-head { display: flex; align-items: center; gap: 8px; width: 100%; }
+.group-head h3 { margin: 0; font-size: var(--t-title); font-weight: 600; }
+.group .hint { margin: 0; }
+
+.field-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.field {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface-2);
+}
+.field-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+/* One card, two borderless inputs, a hairline between them: the app has a
+   single input language and this is it. */
+.field-body { border-radius: var(--r-ctl); background: var(--surface); }
+.field .k, .field .d {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--ink);
+}
+.field .d { border-top: 1px solid var(--line); border-radius: 0 0 var(--r-ctl) var(--r-ctl); }
+.field .k { font-size: var(--t-body); font-weight: 500; }
+.field .d { font-size: var(--t-body); line-height: 1.45; color: var(--ink-2); resize: none; overflow: hidden; }
+.field .k:focus, .field .d:focus { outline: none; box-shadow: inset 0 -2px 0 var(--accent); }
+.field .k::placeholder, .field .d::placeholder { color: var(--ink-3); }
+.field-del { flex: none; }
+
+.settings { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.setting { display: grid; grid-template-columns: 1fr 104px; gap: 4px 12px; align-items: center; }
+.setting-label { font-size: var(--t-body); font-weight: 500; }
+/* A control that does nothing right now should not look live. */
+.setting.off .setting-label, .setting.off .setting-help { color: var(--ink-3); }
+.num {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  text-align: right;
+  font-size: var(--t-body);
+}
+.num:disabled { background: var(--surface-2); color: var(--ink-3); cursor: not-allowed; }
+.num:focus { border-color: var(--accent); outline: none; }
+.setting-help { grid-column: 1 / -1; font-size: var(--t-meta); color: var(--ink-2); }
+
+.popwrap { position: relative; }
+.popover {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: 0 12px 34px -14px rgba(16, 40, 90, 0.5);
+  overflow: hidden;
+}
+.popover input, .popover textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-size: var(--t-body);
+}
+.popover textarea { border-bottom: 0; resize: vertical; font-family: var(--mono); }
+.popover input::placeholder, .popover textarea::placeholder { color: var(--ink-3); }
+.popover input:focus, .popover textarea:focus { outline: none; box-shadow: inset 0 -2px 0 var(--accent); }
+.poplist { max-height: 240px; overflow: auto; padding: 4px; }
+.poplist button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  text-align: left;
+  font-size: var(--t-body);
+  cursor: pointer;
+}
+.poplist button:hover { background: var(--accent-soft); color: var(--accent); }
+.poplist .hint { margin: 6px 8px; }
+.popfoot { display: flex; align-items: center; gap: 8px; padding: 8px; border-top: 1px solid var(--line); }
+
+/* Motion is functional only: the drawer says where it came from, the pulse and
+   the caret say work is still happening. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .icon-btn, .seg button, .doc-card, .doc-mini, .doc-del, .jval, .field .k, .field .d, .num, .fab {
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  }
+  .drawer { animation: slide-in 200ms cubic-bezier(0.22, 0.8, 0.3, 1); }
+  .scrim { animation: fade-in 200ms ease; }
+  .skel-page, .skel-line, .dot.busy { animation: pulse 1.4s ease-in-out infinite; }
+  .caret { animation: blink 1s steps(1) infinite; }
+  @keyframes slide-in { from { transform: translateX(24px); opacity: 0; } }
+  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+  @keyframes blink { 50% { opacity: 0; } }
+}

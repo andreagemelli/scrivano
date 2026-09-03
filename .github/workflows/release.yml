@@ -1,0 +1,131 @@
+# Builds the Scrivano installers for macOS and Windows.
+#
+# On a v* tag it publishes a PUBLIC prerelease with both platforms attached, so
+# anyone can download them. On a manual run it builds both and attaches the
+# installers as workflow artifacts instead, without creating a release.
+#
+# The macOS bundles are UNSIGNED and UNNOTARIZED. Anyone who downloads the .dmg
+# sees "Scrivano is damaged and can't be opened", because Gatekeeper quarantines
+# unsigned downloads. Fixing that properly needs an Apple Developer ID plus
+# notarization credentials (APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+# APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID as repo
+# secrets). Until then the release notes carry the one-line workaround.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# A second push to the same tag should replace the first run, not race it.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --target universal-apple-darwin --bundles dmg,app
+          - os: windows-latest
+            args: --bundles msi,nsis
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # fetch-resources.sh drives the Hugging Face CLI, which no runner image
+      # ships. setup-python is what puts a `python3` and the pip Scripts
+      # directory on PATH inside bash on the Windows runner as well.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      # llama-cpp-2 builds llama.cpp from source and runs bindgen, so Windows
+      # needs cmake on PATH and libclang findable.
+      - name: Install cmake and LLVM (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install -y --no-progress cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+          choco install -y --no-progress llvm
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+          echo "C:\Program Files\CMake\bin" >> $env:GITHUB_PATH
+
+      - name: Install npm deps
+        working-directory: app
+        run: npm ci
+
+      # The OCR graphs and the GGUF are gitignored and add up to 231 MiB, which
+      # is the slowest step in the job. They are pinned files at pinned repos, so
+      # the fetch script is the only thing that can change what lands here.
+      - name: Cache bundled resources
+        uses: actions/cache@v4
+        with:
+          path: app/src-tauri/resources
+          key: resources-${{ hashFiles('app/scripts/fetch-resources.sh') }}
+
+      - name: Install the Hugging Face CLI
+        shell: bash
+        run: python3 -m pip install --upgrade "huggingface_hub[cli]"
+
+      # Idempotent: with a cache hit this is four "already there" checks.
+      - name: Fetch bundled resources
+        working-directory: app
+        shell: bash
+        run: ./scripts/fetch-resources.sh
+
+      # On a tag: a published prerelease, downloadable by anyone. On a manual
+      # run: no release at all, just the installers as workflow artifacts.
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: ${{ github.ref_type == 'tag' && format('Scrivano {0}', github.ref_name) || '' }}
+          releaseBody: |
+            Versione beta. Il modello è un fine-tune da 350M su 149 documenti:
+            leggi sempre quello che estrae.
+
+            **macOS** — scarica il `.dmg`, trascina Scrivano in Applicazioni.
+            La build non è firmata, quindi al primo avvio macOS dice che
+            l'app è danneggiata. Si sblocca con:
+
+            ```
+            xattr -dr com.apple.quarantine "/Applications/Scrivano.app"
+            ```
+
+            **Windows** — scarica il `.exe` (installer NSIS) oppure il `.msi`.
+            SmartScreen segnala un editore sconosciuto: "Ulteriori informazioni"
+            poi "Esegui comunque".
+
+            Il modello (219 MiB) è già dentro l'installer: dopo l'installazione
+            non serve rete.
+          # A draft release is visible only to accounts with push access, so it
+          # is not a download link for anyone else. Published, and flagged as a
+          # prerelease because this is a beta.
+          releaseDraft: false
+          prerelease: true
+          uploadWorkflowArtifacts: true
+          args: ${{ matrix.args }}

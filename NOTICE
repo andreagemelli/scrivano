@@ -1,0 +1,86 @@
+Scrivano
+Copyright (c) 2026 Andrea Gemelli
+
+This product bundles and builds on work from other projects. Each item below
+keeps its own licence; see LICENSE for the terms covering Scrivano itself.
+
+
+MODELS AND DATA SHIPPED INSIDE THE APP
+======================================
+
+LFM2.5-350M-IT-Extract (resources/model.gguf, 219 MiB, Q4_K_M)
+  https://huggingface.co/andreagemelli/LFM2.5-350M-IT-Extract-GGUF
+  Two licences apply to these weights at once:
+    - CC BY-NC-SA 4.0, inherited from the XFUND training data below
+    - LFM Open License v1.0, inherited from the base model below
+
+  Base model:  LiquidAI/LFM2.5-350M
+               https://huggingface.co/LiquidAI/LFM2.5-350M
+               LFM Open License v1.0. Apache-2.0 derived, no copyleft, requires
+               that notices are retained, modifications documented and a copy of
+               the licence passed on. Commercial use is granted only below
+               10,000,000 USD of annual revenue.
+
+  Training data: XFUND, Italian split
+               https://github.com/doc-analysis/XFUND
+               Copyright (c) Microsoft Corporation
+               CC BY-NC-SA 4.0. Attribution, NonCommercial, ShareAlike.
+               Reshaped into a flat key/value schema by local/make_kie.py and
+               published as https://huggingface.co/datasets/andreagemelli/xfund-kie-it
+               under the same licence.
+
+PP-OCRv5 mobile detection (resources/det.onnx)
+  https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx
+  Copyright (c) PaddlePaddle Authors. Apache License 2.0.
+
+PP-OCRv5 mobile Latin recognition (resources/rec.onnx, resources/dict.txt)
+  https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec_onnx
+  Copyright (c) PaddlePaddle Authors. Apache License 2.0.
+  dict.txt is extracted verbatim from that repository's inference.yml.
+
+
+RUST DEPENDENCIES LINKED INTO THE BINARY
+========================================
+
+llama-cpp-2 0.1.156                MIT OR Apache-2.0
+  Statically links llama.cpp (https://github.com/ggml-org/llama.cpp), MIT,
+  Copyright (c) 2023-2024 The ggml authors, compiled from source at build time.
+oar-ocr 0.9.2                      Apache-2.0
+ort 2.0.0-rc.13 (ONNX Runtime)     MIT OR Apache-2.0
+  Links ONNX Runtime, Copyright (c) Microsoft Corporation, MIT.
+tauri 2.11.5 and plugins           MIT OR Apache-2.0
+image 0.25.10                      MIT OR Apache-2.0
+encoding_rs 0.8.35                 (MIT OR Apache-2.0) AND BSD-3-Clause
+anyhow, serde, serde_json          MIT OR Apache-2.0
+
+The full dependency tree with resolved versions is app/src-tauri/Cargo.lock.
+
+
+WEB DEPENDENCIES SHIPPED IN THE FRONTEND BUNDLE
+===============================================
+
+react 19.2.8, react-dom 19.2.8     MIT, Copyright (c) Meta Platforms, Inc.
+@tauri-apps/api 2.11.1             Apache-2.0 OR MIT
+@phosphor-icons/react 2.1.10       MIT, Copyright (c) Phosphor Icons
+pdfjs-dist 6.3.289                 Apache-2.0, Copyright (c) Mozilla Foundation
+
+pdf.js also brings its own vendored assets. They live in node_modules/pdfjs-dist
+and are copied verbatim into app/dist/ at build time, licence files included,
+then into the installer:
+
+  standard_fonts/  Liberation fonts (SIL Open Font License 1.1) and Foxit fonts
+                   (see standard_fonts/LICENSE_LIBERATION, LICENSE_FOXIT)
+  wasm/            JBIG2, OpenJPEG and QCMS decoders
+                   (see wasm/LICENSE_JBIG2, LICENSE_OPENJPEG, LICENSE_QCMS
+                   and the matching LICENSE_PDFJS_* files)
+  iccs/            CGATS001Compat colour profile (see iccs/LICENSE)
+  cmaps/           Adobe CMap resources, BSD-3-Clause, Copyright (c) Adobe
+
+
+SAMPLE DOCUMENT
+===============
+
+examples/dichiarazione-residenza.pdf is written for this repository and is
+covered by LICENSE like the rest of it. Every detail printed on it - the
+comune, the person, the codice fiscale, the addresses, the document and plate
+numbers, the protocol number - is fabricated. It is not anybody's real form.
