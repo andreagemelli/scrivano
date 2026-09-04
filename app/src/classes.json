@@ -7,6 +7,30 @@
     "it": {
       "name": "domanda",
       "description": "un modulo compilato per richiedere un beneficio, un permesso, un contributo o l'ammissione"
+    },
+    "de": {
+      "name": "antrag",
+      "description": "ein Formular, mit dem eine Leistung, eine Genehmigung, eine Förderung oder eine Zulassung beantragt wird"
+    },
+    "es": {
+      "name": "solicitud",
+      "description": "un formulario con el que se solicita una prestación, un permiso, una ayuda o la admisión"
+    },
+    "fr": {
+      "name": "demande",
+      "description": "un formulaire par lequel on demande une prestation, une autorisation, une subvention ou une admission"
+    },
+    "pt": {
+      "name": "requerimento",
+      "description": "um formulário com que se requer um benefício, uma licença, um auxílio ou a admissão"
+    },
+    "zh": {
+      "name": "申请表",
+      "description": "用于申请补助、许可、资助或入学等事项的表格"
+    },
+    "ja": {
+      "name": "申請書",
+      "description": "給付・許可・助成・入学などを申請するために記入する書式"
     }
   },
   "registration_form": {
@@ -17,6 +41,30 @@
     "it": {
       "name": "iscrizione",
       "description": "un modulo compilato per iscrivere o registrare una persona, un ente o un bene"
+    },
+    "de": {
+      "name": "anmeldung",
+      "description": "ein Formular, mit dem eine Person, eine Organisation oder eine Sache registriert oder angemeldet wird"
+    },
+    "es": {
+      "name": "inscripcion",
+      "description": "un formulario con el que se inscribe o registra a una persona, una entidad o un bien"
+    },
+    "fr": {
+      "name": "inscription",
+      "description": "un formulaire par lequel une personne, un organisme ou un bien est inscrit ou enregistré"
+    },
+    "pt": {
+      "name": "inscricao",
+      "description": "um formulário com que se inscreve ou cadastra uma pessoa, uma entidade ou um bem"
+    },
+    "zh": {
+      "name": "登记表",
+      "description": "用于登记或注册个人、单位或物品信息的表格"
+    },
+    "ja": {
+      "name": "登録用紙",
+      "description": "個人・団体・物件を登録または届け出るために記入する書式"
     }
   },
   "declaration": {
@@ -27,6 +75,30 @@
     "it": {
       "name": "dichiarazione",
       "description": "una dichiarazione con cui chi firma attesta dei fatti sotto la propria responsabilità"
+    },
+    "de": {
+      "name": "erklärung",
+      "description": "eine Erklärung, in der die unterzeichnende Person Tatsachen in eigener Verantwortung versichert"
+    },
+    "es": {
+      "name": "declaracion",
+      "description": "una declaración en la que quien firma da fe de unos hechos bajo su responsabilidad"
+    },
+    "fr": {
+      "name": "declaration",
+      "description": "une déclaration par laquelle le signataire atteste des faits sous sa responsabilité"
+    },
+    "pt": {
+      "name": "declaracao",
+      "description": "uma declaração em que quem assina atesta fatos sob sua responsabilidade"
+    },
+    "zh": {
+      "name": "声明书",
+      "description": "签署人对所述事实承担责任的声明或承诺文件"
+    },
+    "ja": {
+      "name": "申告書",
+      "description": "署名者が自らの責任において事実を申し立てる書面"
     }
   },
   "contract": {
@@ -37,6 +109,30 @@
     "it": {
       "name": "contratto",
       "description": "un accordo tra le parti che stabilisce obblighi reciproci, compresi locazioni e condizioni di servizio"
+    },
+    "de": {
+      "name": "vertrag",
+      "description": "eine Vereinbarung zwischen Parteien über gegenseitige Pflichten, einschließlich Miet- und Nutzungsverträgen"
+    },
+    "es": {
+      "name": "contrato",
+      "description": "un acuerdo entre partes que fija obligaciones recíprocas, incluidos arrendamientos y condiciones de servicio"
+    },
+    "fr": {
+      "name": "contrat",
+      "description": "un accord entre les parties fixant des obligations réciproques, y compris baux et conditions de service"
+    },
+    "pt": {
+      "name": "contrato",
+      "description": "um acordo entre as partes que estabelece obrigações recíprocas, inclusive locações e condições de serviço"
+    },
+    "zh": {
+      "name": "合同",
+      "description": "各方之间约定相互权利义务的协议，包括租赁和服务条款"
+    },
+    "ja": {
+      "name": "契約書",
+      "description": "当事者間の権利義務を定めた合意書。賃貸借契約や利用規約を含む"
     }
   },
   "invoice": {
@@ -47,6 +143,30 @@
     "it": {
       "name": "fattura",
       "description": "il documento con cui un fornitore addebita beni o servizi e l'importo dovuto"
+    },
+    "de": {
+      "name": "rechnung",
+      "description": "eine Aufstellung gelieferter Waren oder Leistungen und des fälligen Betrags"
+    },
+    "es": {
+      "name": "factura",
+      "description": "el documento con el que un proveedor cobra bienes o servicios y el importe debido"
+    },
+    "fr": {
+      "name": "facture",
+      "description": "le document par lequel un fournisseur facture des biens ou des services et le montant dû"
+    },
+    "pt": {
+      "name": "fatura",
+      "description": "o documento com que um fornecedor cobra bens ou serviços e o valor devido"
+    },
+    "zh": {
+      "name": "发票",
+      "description": "供应商就所提供货物或服务开具并载明应付金额的凭证"
+    },
+    "ja": {
+      "name": "請求書",
+      "description": "提供した物品や役務と支払うべき金額を記載して発行する書面"
     }
   },
   "receipt": {
@@ -57,6 +177,30 @@
     "it": {
       "name": "ricevuta",
       "description": "la prova che un pagamento è stato eseguito o che dei beni sono stati ricevuti"
+    },
+    "de": {
+      "name": "quittung",
+      "description": "der Nachweis, dass eine Zahlung geleistet oder eine Ware empfangen wurde"
+    },
+    "es": {
+      "name": "recibo",
+      "description": "la prueba de que se ha realizado un pago o de que se han recibido unos bienes"
+    },
+    "fr": {
+      "name": "recu",
+      "description": "la preuve qu'un paiement a été effectué ou que des biens ont été reçus"
+    },
+    "pt": {
+      "name": "recibo",
+      "description": "a prova de que um pagamento foi feito ou de que bens foram recebidos"
+    },
+    "zh": {
+      "name": "收据",
+      "description": "证明款项已支付或货物已收讫的凭证"
+    },
+    "ja": {
+      "name": "領収書",
+      "description": "代金が支払われたこと、または物品を受領したことを示す書面"
     }
   },
   "certificate": {
@@ -67,6 +211,30 @@
     "it": {
       "name": "certificato",
       "description": "un documento rilasciato da un'autorità che attesta un fatto, un titolo o uno stato"
+    },
+    "de": {
+      "name": "bescheinigung",
+      "description": "ein von einer Stelle ausgestelltes Dokument, das eine Tatsache, eine Qualifikation oder einen Status bestätigt"
+    },
+    "es": {
+      "name": "certificado",
+      "description": "un documento expedido por una autoridad que acredita un hecho, una titulación o una situación"
+    },
+    "fr": {
+      "name": "attestation",
+      "description": "un document délivré par une autorité qui atteste un fait, un diplôme ou une situation"
+    },
+    "pt": {
+      "name": "certificado",
+      "description": "um documento emitido por uma autoridade que atesta um fato, uma qualificação ou uma situação"
+    },
+    "zh": {
+      "name": "证明书",
+      "description": "由主管机构出具、用以证明某项事实、资格或状态的文件"
+    },
+    "ja": {
+      "name": "証明書",
+      "description": "機関が事実・資格・身分を証明するために発行する書面"
     }
   },
   "curriculum_vitae": {
@@ -77,6 +245,30 @@
     "it": {
       "name": "curriculum",
       "description": "il riepilogo del percorso di studi e dell'esperienza professionale di una persona"
+    },
+    "de": {
+      "name": "lebenslauf",
+      "description": "die Darstellung von Ausbildung und beruflichem Werdegang einer Person"
+    },
+    "es": {
+      "name": "curriculum",
+      "description": "el resumen de la formación y la experiencia profesional de una persona"
+    },
+    "fr": {
+      "name": "cv",
+      "description": "le récapitulatif de la formation et de l'expérience professionnelle d'une personne"
+    },
+    "pt": {
+      "name": "curriculo",
+      "description": "o resumo da formação e da experiência profissional de uma pessoa"
+    },
+    "zh": {
+      "name": "简历",
+      "description": "个人教育经历和工作经历的概要"
+    },
+    "ja": {
+      "name": "履歴書",
+      "description": "学歴と職歴をまとめた個人の経歴書"
     }
   },
   "questionnaire": {
@@ -87,6 +279,30 @@
     "it": {
       "name": "questionario",
       "description": "una serie di domande rivolte a un destinatario per raccogliere opinioni o informazioni"
+    },
+    "de": {
+      "name": "fragebogen",
+      "description": "eine Reihe von Fragen zur Erhebung von Angaben oder Meinungen"
+    },
+    "es": {
+      "name": "cuestionario",
+      "description": "un conjunto de preguntas dirigidas a una persona para recoger opiniones o datos"
+    },
+    "fr": {
+      "name": "questionnaire",
+      "description": "une série de questions adressées à un répondant pour recueillir des avis ou des informations"
+    },
+    "pt": {
+      "name": "questionario",
+      "description": "um conjunto de perguntas dirigidas a um respondente para recolher opiniões ou informações"
+    },
+    "zh": {
+      "name": "调查问卷",
+      "description": "向填写人提出的一组问题，用以收集意见或信息"
+    },
+    "ja": {
+      "name": "アンケート",
+      "description": "意見や情報を集めるために回答者に示す一連の質問"
     }
   },
   "medical_form": {
@@ -97,6 +313,30 @@
     "it": {
       "name": "modulo-sanitario",
       "description": "un modulo clinico o sanitario, come un'anamnesi, una prescrizione o un consenso alle cure"
+    },
+    "de": {
+      "name": "arztformular",
+      "description": "ein medizinisches Formular, etwa eine Anamnese, ein Rezept oder eine Einwilligung zur Behandlung"
+    },
+    "es": {
+      "name": "formulario-medico",
+      "description": "un formulario clínico o sanitario, como un historial, una receta o un consentimiento"
+    },
+    "fr": {
+      "name": "formulaire-medical",
+      "description": "un formulaire clinique ou médical, tel qu'un questionnaire de santé, une ordonnance ou un consentement"
+    },
+    "pt": {
+      "name": "formulario-medico",
+      "description": "um formulário clínico ou de saúde, como uma anamnese, uma prescrição ou um consentimento"
+    },
+    "zh": {
+      "name": "医疗表格",
+      "description": "临床或健康相关的表格，如病史记录、处方或治疗同意书"
+    },
+    "ja": {
+      "name": "医療書式",
+      "description": "既往歴・処方・治療同意など、診療や健康に関する書式"
     }
   },
   "order_form": {
@@ -107,6 +347,30 @@
     "it": {
       "name": "ordine",
       "description": "un modulo con cui si ordinano beni o servizi, con articoli e quantità"
+    },
+    "de": {
+      "name": "bestellung",
+      "description": "ein Formular zur Bestellung von Waren oder Leistungen mit Artikeln und Mengen"
+    },
+    "es": {
+      "name": "pedido",
+      "description": "un formulario para pedir bienes o servicios, con artículos y cantidades"
+    },
+    "fr": {
+      "name": "bon-de-commande",
+      "description": "un formulaire pour commander des biens ou des services, avec les articles et les quantités"
+    },
+    "pt": {
+      "name": "pedido",
+      "description": "um formulário para encomendar bens ou serviços, com itens e quantidades"
+    },
+    "zh": {
+      "name": "订单",
+      "description": "用于订购货物或服务并列明品名和数量的表格"
+    },
+    "ja": {
+      "name": "注文書",
+      "description": "物品や役務を品名と数量を挙げて注文するための書式"
     }
   },
   "power_of_attorney": {
@@ -117,6 +381,30 @@
     "it": {
       "name": "delega",
       "description": "un atto con cui una persona autorizza un'altra ad agire per suo conto"
+    },
+    "de": {
+      "name": "vollmacht",
+      "description": "ein Dokument, mit dem eine Person eine andere zum Handeln in ihrem Namen ermächtigt"
+    },
+    "es": {
+      "name": "poder",
+      "description": "un documento por el que una persona autoriza a otra a actuar en su nombre"
+    },
+    "fr": {
+      "name": "procuration",
+      "description": "un acte par lequel une personne autorise une autre à agir en son nom"
+    },
+    "pt": {
+      "name": "procuracao",
+      "description": "um documento pelo qual uma pessoa autoriza outra a agir em seu nome"
+    },
+    "zh": {
+      "name": "委托书",
+      "description": "一方授权另一方代为办理事项的文件"
+    },
+    "ja": {
+      "name": "委任状",
+      "description": "本人が代理人に手続きを委任することを示す書面"
     }
   }
 }

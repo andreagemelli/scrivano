@@ -263,4 +263,53 @@ mod tests {
 
         super::unload();
     }
+
+    /// The model names the class in the DOCUMENT's language, not in the language
+    /// of the list it was handed. This is not a bug to fix here — it is the
+    /// behaviour `classAlias()` in catalog.ts exists to absorb, and pinning it
+    /// is what keeps that table honest if a future fine-tune changes its mind.
+    #[test]
+    fn answers_in_the_documents_language() {
+        let gguf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("model.gguf");
+        if !gguf.exists() {
+            eprintln!("skipping: run scripts/fetch-resources.sh first");
+            return;
+        }
+
+        // An ENGLISH class listing over an ITALIAN page: what the app sends when
+        // the reader has chosen English but the documents are Italian.
+        const PROMPT: &str = "<|startoftext|><|im_start|>system\n\
+             You are an expert document analysis model.\n\
+             Task: document classification\n\
+             Assign the document to exactly one of the classes listed below. \
+             Answer with a JSON object of the form {\"class\": \"<class>\"}.\n\n\
+             Classes:\n\
+             invoice: a bill issued by a supplier listing goods or services supplied and the amount due.\n\
+             declaration: a statement in which the signer declares facts under their own responsibility.\n\
+             resume: a personal record of education and professional experience.\n\
+             <|im_end|>\n\
+             <|im_start|>user\n\
+             FATTURA N. 42\nData 12/03/2019\nImponibile 100,00\nIVA 22%\nTotale 122,00\n\
+             <|im_end|>\n\
+             <|im_start|>assistant\n";
+
+        let greedy = Sampling {
+            temperature: 0.0,
+            top_k: 0,
+            top_p: 1.0,
+            max_tokens: 64,
+            seed: 42,
+        };
+        let out = super::run(&gguf, PROMPT, &greedy, |_| {}).expect("generation");
+        eprintln!("cross-language class: {out}");
+        assert!(out.contains("\"class\""), "expected a {{\"class\": ...}} object");
+        assert!(
+            out.contains("fattura") || out.contains("invoice"),
+            "expected the invoice class in either language, got {out}"
+        );
+
+        super::unload();
+    }
 }

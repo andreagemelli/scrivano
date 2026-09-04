@@ -23,7 +23,12 @@ const EN = {
   lang: "en" as Lang,
   /** The `lang` attribute on <html>, for hyphenation and screen readers. */
   htmlLang: "en",
-  languageLabel: "Language",
+  docLanguage: "Documents are in",
+  projectLanguageHelp:
+    "The language the documents in this folder are written in. It sets the class names below and the schema a document opened in here starts from. One document can still differ — the extraction settings override it for that document alone.",
+  docLanguageHelp:
+    "The language THIS document is written in, overriding its folder's. Keys, descriptions and class names go into the prompt in that language, because the model was fine-tuned with the prompt and the page in the same one — an English schema on an Italian page measurably invents values. Separate from the language of this interface.",
+  classHelp: "What the model decided this document is, asked for when it was opened.",
 
   // Topbar
   betaTitle: "Beta: the model is still moving.",
@@ -186,11 +191,31 @@ const EN = {
   classifyOnOpen: "Classify on open",
   classifyHelp:
     "The class is asked for once, as soon as a document is opened, because there is nothing to configure per run. Extraction stays manual: it depends on a schema you choose first.",
-  classifyOff: "Off. Documents open without a class.",
+  classifyOff: "Classification is off, so documents open without a class. The list below is kept for when it is switched back on.",
+  classCount: (n: number) => count(n, "class", "classes"),
+  off: "Off",
   restoreClasses: "Restore the twelve trained classes",
   classesChanged:
     "This list no longer matches the twelve classes the model was fine-tuned on. It will still answer with one of these names, but only the trained ones are backed by training.",
   noClass: "no class",
+
+  // Projects
+  project: "Project",
+  projectSettings: "Project settings",
+  projectName: "Name",
+  firstProject: "Documents",
+  newProject: "New project",
+  newProjectName: "Untitled project",
+  projectHelp: (n: number) =>
+    `${count(n, "document", "documents")} in here. Every document opened while this project is chosen is classified the way it says below — a folder of invoices and a folder of forms rarely want the same list.`,
+  deleteProject: "Delete project",
+  deleteProjectHelp: (n: number) =>
+    n === 0
+      ? "Deletes this project. It is empty, so nothing else changes."
+      : `Deletes this project. Its ${count(n, "document", "documents")} move to the first one rather than being thrown away.`,
+  chooseProject: "Choose a project",
+  lastProject: "The last project cannot be deleted: documents have to open somewhere.",
+  openProjectSettings: "Project settings",
 
   // Ordering the rail
   order: "Order",
@@ -227,7 +252,12 @@ export type Dict = typeof EN;
 const IT: Dict = {
   lang: "it",
   htmlLang: "it",
-  languageLabel: "Lingua",
+  docLanguage: "I documenti sono in",
+  projectLanguageHelp:
+    "La lingua in cui sono scritti i documenti di questa cartella. Determina i nomi delle classi qui sotto e lo schema da cui parte un documento aperto qui. Un singolo documento può comunque differire: le impostazioni di estrazione lo sovrascrivono solo per quel documento.",
+  docLanguageHelp:
+    "La lingua in cui è scritto QUESTO documento, che prevale su quella della cartella. Chiavi, descrizioni e nomi delle classi entrano nel prompt in quella lingua, perché il modello è stato addestrato con prompt e pagina nella stessa: uno schema inglese su una pagina italiana inventa valori in modo misurabile. È una scelta distinta dalla lingua di questa interfaccia.",
+  classHelp: "Che cosa il modello ha deciso che sia questo documento, chiesto all'apertura.",
 
   betaTitle: "Versione beta: il modello è ancora in evoluzione.",
   statusLabel: {
@@ -386,11 +416,30 @@ const IT: Dict = {
   classifyOnOpen: "Classifica all'apertura",
   classifyHelp:
     "La classe viene chiesta una volta sola, appena il documento viene aperto, perché non c'è nulla da configurare per ogni esecuzione. L'estrazione resta manuale: dipende da uno schema che scegli prima.",
-  classifyOff: "Disattivata. I documenti si aprono senza classe.",
+  classifyOff: "La classificazione è disattivata, quindi i documenti si aprono senza classe. L'elenco qui sotto resta per quando la riattivi.",
+  classCount: (n) => count(n, "classe", "classi"),
+  off: "Off",
   restoreClasses: "Ripristina le dodici classi addestrate",
   classesChanged:
     "Questo elenco non corrisponde più alle dodici classi su cui il modello è stato addestrato. Risponderà comunque con uno di questi nomi, ma solo quelli addestrati hanno un addestramento alle spalle.",
   noClass: "senza classe",
+
+  project: "Progetto",
+  projectSettings: "Impostazioni del progetto",
+  projectName: "Nome",
+  firstProject: "Documenti",
+  newProject: "Nuovo progetto",
+  newProjectName: "Progetto senza nome",
+  projectHelp: (n) =>
+    `${count(n, "documento", "documenti")} qui dentro. Ogni documento aperto mentre questo progetto è scelto viene classificato come dice qui sotto: una cartella di fatture e una di moduli raramente vogliono lo stesso elenco.`,
+  deleteProject: "Elimina il progetto",
+  deleteProjectHelp: (n) =>
+    n === 0
+      ? "Elimina questo progetto. È vuoto, quindi non cambia nient'altro."
+      : `Elimina questo progetto. I suoi ${count(n, "documento", "documenti")} passano al primo, invece di essere buttati via.`,
+  chooseProject: "Scegli un progetto",
+  lastProject: "L'ultimo progetto non si può eliminare: i documenti devono pur aprirsi da qualche parte.",
+  openProjectSettings: "Impostazioni del progetto",
 
   order: "Ordina",
   orderRecent: "Più recenti",

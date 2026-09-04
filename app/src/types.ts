@@ -6,8 +6,16 @@ export type Field = { key: string; description: string };
 /** The two things the model was fine-tuned to do. */
 export type Task = "extract" | "classify";
 
-/** UI language, and the language the schema and class names are written in. */
+/** The language the interface is written in. Two, because someone writes them. */
 export type Lang = "en" | "it";
+
+/**
+ * The language the DOCUMENT is in, which is the language its schema keys, their
+ * descriptions and the class names must be written in — the fine-tune saw prompt
+ * and page in the same language, and mixing them costs real accuracy. Eight,
+ * because that is what the model knows; it is not the same choice as `Lang`.
+ */
+export type DocLang = "en" | "it" | "de" | "es" | "fr" | "pt" | "zh" | "ja";
 
 /** Normalised to 0..1 against the rendered page image, so the UI never needs the pixel size. */
 export type Box = { x: number; y: number; w: number; h: number };
@@ -51,10 +59,44 @@ export type Doc = {
   /** Decode rate of the last run, tokens per second. Absent if it never ran. */
   tps?: number;
   /**
-   * The class the model assigned on load, as the localized name it answered
-   * with. Absent when classification is off, unanswerable, or was rejected.
+   * The class the model assigned on load, as the name shown in the class list.
+   * Absent when classification is off, was switched off, or the model answered
+   * with something that is not a class at all.
    */
   docClass?: string;
+  /** The project this document was opened into. Absent on 0.2.x history. */
+  projectId?: string;
+  /**
+   * This one document's language, when it is not its folder's. A German page in
+   * a folder of Italian ones is a real thing and it needs a German schema: the
+   * project's language is a default, not a rule.
+   */
+  docLang?: DocLang;
+};
+
+/**
+ * A folder of documents that share a way of being classified.
+ *
+ * Classification is the one setting that is genuinely about a BATCH rather than
+ * about a document or about the model: a folder of invoices wants a different
+ * class list, or none at all, from a folder of municipal forms. So it belongs to
+ * the folder, and not to the extraction settings where it started out.
+ */
+export type Project = {
+  id: string;
+  /** Empty means the first project, which is named by the interface language. */
+  name: string;
+  /**
+   * The language the documents in here are written in. It decides two things:
+   * which class names the model is shown, and which schema a new document in
+   * this folder starts from. Both have to be in the document's own language, so
+   * this is the one setting a folder cannot do without.
+   */
+  docLang: DocLang;
+  /** Ask the model for a class as soon as a document is opened in here. */
+  classify: boolean;
+  /** The classes it may pick from. Editable per project, so it is stored. */
+  classes: Field[];
 };
 
 /** Decoding knobs sent to llama.cpp with every run. Mirrors `Sampling` in llm.rs. */

@@ -1,6 +1,6 @@
 /** npm test. Guards the model contract: if this fails, extraction quality is next. */
 import { buildSystem, buildPrompt, parseAnswer, parseClass, isGrounded } from "./prompt";
-import { classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
+import { DOC_LANGS, classAlias, classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
 
 /** No framework and no @types/node: one comparison is the whole harness. */
 function eq(got: unknown, want: unknown, what = "") {
@@ -41,8 +41,8 @@ eq(cls.startsWith(CLS_GOLDEN), true, "classification header");
 eq(cls.slice(CLS_GOLDEN.length).split("\n").length - 1, 12, "twelve class lines");
 eq(cls.includes("delega: "), true, "the localized class name, not the id");
 
-// Every published key of both shipped languages: header verbatim, one line each.
-for (const lang of ["en", "it"] as const) {
+// Every published key of every shipped language: header verbatim, one line each.
+for (const lang of DOC_LANGS) {
   const all = Object.entries(schemaFor(lang)).map(([key, description]) => ({
     key,
     description,
@@ -83,6 +83,25 @@ eq(parseClass('{"class": "modulo strano"}', classes), null);
 eq(parseClass('{"cognome": "Rossi"}', classes), null);
 eq(parseClass("dichiarazione", classes), null);
 eq(parseClass('{"class": "ricevuta"}', classesToFields()), "ricevuta");
+
+// The case that made classification look broken: the model names the class in
+// the DOCUMENT's language whatever language the list it was handed is in, so an
+// Italian page answered "dichiarazione" against the English list and every
+// answer was thrown away. It resolves to the name the list actually uses.
+const english = defaultClasses("en");
+eq(parseClass('{"class": "dichiarazione"}', english), null, "no alias, no match");
+eq(parseClass('{"class": "dichiarazione"}', english, classAlias("en")), "declaration");
+eq(parseClass('{"class": "領収書"}', english, classAlias("en")), "receipt");
+eq(parseClass('{"class": "Antrag"}', english, classAlias("en")), "application");
+// Every language resolves to every other, or the table has a hole in it.
+for (const from of DOC_LANGS) {
+  for (const to of DOC_LANGS) {
+    const said = defaultClasses(from)[7].key; // curriculum_vitae, an id whose names differ everywhere
+    eq(parseClass(`{"class": "${said}"}`, defaultClasses(to), classAlias(to)), defaultClasses(to)[7].key, `${from}->${to}`);
+  }
+}
+// An alias must never resurrect a class the caller deliberately removed.
+eq(parseClass('{"class": "dichiarazione"}', english.filter((c) => c.key !== "declaration"), classAlias("en")), null);
 
 /** The class list as the settings panel keeps it: same shape, order preserved. */
 function classesToFields() {

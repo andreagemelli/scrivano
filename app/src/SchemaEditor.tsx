@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { CaretDown, Check, Plus, Question, Trash, Warning } from "@phosphor-icons/react";
 import { useT } from "./i18n";
 import type { Field } from "./types";
@@ -12,6 +12,7 @@ export default function SchemaEditor({
   fields,
   known,
   kind,
+  head,
   onChange,
 }: {
   fields: Field[];
@@ -19,6 +20,14 @@ export default function SchemaEditor({
   known: Record<string, string>;
   /** Which of the two lists this is. Only the words differ. */
   kind: "field" | "class";
+  /**
+   * Controls the caller wants on this editor's own header row. The Classes tab
+   * has two of them, and wrapping this component to place them instead put a
+   * `.group` inside a `.group` — whose `align-items: flex-start` then stopped
+   * the whole list from stretching, which is why the class rows were half a
+   * drawer wide while the identical schema rows were not.
+   */
+  head?: ReactNode;
   onChange: (f: Field[]) => void;
 }) {
   const shared = useT();
@@ -90,12 +99,13 @@ export default function SchemaEditor({
     <section className="group">
       {/* No title and no count here: the drawer's tab bar already carries both. */}
       <div className="group-head">
+        {head}
         {/* The model wants the prompt in the document's own language, and a
             description written in another one quietly makes the answer worse.
             Say it here, where the descriptions are edited. */}
-        <span className="help" title={t.help}>
+        <button className="help" aria-label={t.help} data-hint={t.help}>
           <Question size={14} weight="regular" />
-        </span>
+        </button>
         <span className="grow" />
         <div
           className="popwrap"
@@ -128,7 +138,7 @@ export default function SchemaEditor({
                   return (
                     <button
                       key={k}
-                      title={known[k]}
+                      data-hint={known[k]}
                       // WebKit does not focus a button on click, so letting the
                       // press move focus fires the wrapper's blur handler, closes
                       // the popover and the click never lands. Holding focus on
@@ -219,17 +229,17 @@ export default function SchemaEditor({
                 onChange={(e) => set(i, { ...f, description: e.target.value })}
                 onKeyDown={(e) => onKeyDown(e, i, false)}
               />
-              {f.key.trim() !== "" && !(f.key in known) && (
-                <span className="flag" title={t.untrainedHelp}>
-                  <Warning size={13} weight="regular" />
-                  {t.untrained}
-                </span>
-              )}
             </div>
+            {f.key.trim() !== "" && !(f.key in known) && (
+              <span className="flag field-flag" data-hint={t.untrainedHelp}>
+                <Warning size={13} weight="regular" />
+                {t.untrained}
+              </span>
+            )}
             <button
               className="icon-btn field-del"
               aria-label={shared.removeRow(f.key.trim() === "" ? t.theRow : f.key)}
-              title={shared.removeRow(f.key.trim() === "" ? t.theRow : f.key)}
+              data-hint={shared.removeRow(f.key.trim() === "" ? t.theRow : f.key)}
               onClick={() => remove(i)}
             >
               <Trash size={15} weight="regular" />

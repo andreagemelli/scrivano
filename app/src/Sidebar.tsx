@@ -1,8 +1,20 @@
 import { useState } from "react";
-import { Plus, SidebarSimple, Trash, Warning } from "@phosphor-icons/react";
+import {
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Funnel,
+  Gear,
+  Plus,
+  SidebarSimple,
+  Tag as TagIcon,
+  Trash,
+  Warning,
+} from "@phosphor-icons/react";
+import Menu from "./Menu";
 import { useT } from "./i18n";
 import type { Dict } from "./i18n";
-import type { Doc } from "./types";
+import type { Doc, Project } from "./types";
 
 /** How the rail is arranged. "class" is the one that groups rather than sorts. */
 type Order = "recent" | "name" | "class";
@@ -84,6 +96,13 @@ function arrange(t: Dict, docs: Doc[], order: Order): (Doc | { heading: string }
 
 export default function Sidebar({
   docs,
+  projects,
+  project,
+  counts,
+  onProject,
+  onNewProject,
+  onEditProject,
+  onDeleteProject,
   activeId,
   open,
   onToggle,
@@ -91,7 +110,16 @@ export default function Sidebar({
   onAdd,
   onDelete,
 }: {
+  /** Only this project's documents. The rail never shows another folder's. */
   docs: Doc[];
+  projects: Project[];
+  project: Project;
+  /** How many documents each folder holds, for the delete warning. */
+  counts: Record<string, number>;
+  onProject: (id: string) => void;
+  onNewProject: () => void;
+  onEditProject: () => void;
+  onDeleteProject: (id: string) => void;
   activeId: string | null;
   open: boolean;
   onToggle: () => void;
@@ -113,24 +141,83 @@ export default function Sidebar({
           className="icon-btn"
           aria-label={label}
           aria-expanded={open}
-          title={label}
+          data-hint={label}
           onClick={onToggle}
         >
           <SidebarSimple size={17} weight="regular" />
         </button>
         {open && <span className="rail-count">{t.documents(docs.length)}</span>}
+        {open && (
+          <>
+            <span className="grow" />
+            {/* Sorting and grouping are one question, so they are one control,
+                and it lives as an icon rather than a labelled row: the rail is
+                240px and the folders above it need the space more. */}
+            <Menu
+              value={order}
+              choices={[
+                { value: "recent" as Order, label: t.orderRecent },
+                { value: "name" as Order, label: t.orderName },
+                { value: "class" as Order, label: t.orderClass },
+              ]}
+              label={t.order}
+              hint={t.order}
+              icon={<Funnel size={15} weight={order === "recent" ? "regular" : "fill"} />}
+              align="right"
+              onChange={setOrder}
+            />
+          </>
+        )}
       </div>
 
-      {/* One control for both, and only once there is something to arrange. */}
-      {open && docs.length > 1 && (
-        <label className="rail-order">
-          <span className="muted">{t.order}</span>
-          <select value={order} onChange={(e) => setOrder(e.target.value as Order)}>
-            <option value="recent">{t.orderRecent}</option>
-            <option value="name">{t.orderName}</option>
-            <option value="class">{t.orderClass}</option>
-          </select>
-        </label>
+      {open && (
+        <div className="rail-projects">
+          {/* Folders, listed like folders. Each carries the language its
+              documents are in — the one setting that decides both the schema a
+              new document starts from and the class names the model is shown —
+              and its own way in and out. */}
+          {projects.map((p) => (
+            <div
+              key={p.id}
+              className={p.id === project.id ? "folder active" : "folder"}
+              onDoubleClick={() => p.id === project.id && onEditProject()}
+            >
+              <button className="folder-main" aria-current={p.id === project.id} onClick={() => onProject(p.id)}>
+                {p.id === project.id ? (
+                  <FolderOpen size={15} weight="fill" />
+                ) : (
+                  <Folder size={15} weight="regular" />
+                )}
+                <span className="folder-name">{p.name.trim() === "" ? t.firstProject : p.name}</span>
+                <span className="folder-lang">{p.docLang.toUpperCase()}</span>
+              </button>
+              <button
+                className="icon-btn folder-act"
+                aria-label={t.openProjectSettings}
+                data-hint={t.openProjectSettings}
+                onClick={() => {
+                  onProject(p.id);
+                  onEditProject();
+                }}
+              >
+                <Gear size={14} weight="regular" />
+              </button>
+              <button
+                className="icon-btn folder-act"
+                aria-label={t.deleteProject}
+                data-hint={projects.length > 1 ? t.deleteProjectHelp(counts[p.id] ?? 0) : t.lastProject}
+                disabled={projects.length < 2}
+                onClick={() => onDeleteProject(p.id)}
+              >
+                <Trash size={14} weight="regular" />
+              </button>
+            </div>
+          ))}
+          <button className="folder-new" onClick={onNewProject}>
+            <FolderPlus size={15} weight="regular" />
+            {t.newProject}
+          </button>
+        </div>
       )}
 
       <div className="rail-list">
@@ -139,6 +226,7 @@ export default function Sidebar({
         {items.map((item) =>
           "heading" in item ? (
             <h3 className="rail-group" key={`h:${item.heading}`}>
+              <TagIcon size={12} weight="regular" />
               {item.heading}
             </h3>
           ) : open ? (
@@ -147,25 +235,32 @@ export default function Sidebar({
               className={item.id === activeId ? "doc-card active" : "doc-card"}
             >
               <button className="doc-main" onClick={() => onSelect(item.id)}>
-                <span className="doc-name" title={item.name}>
+                <span className="doc-name" data-hint={item.name}>
                   {item.name}
                 </span>
+                {/* What the model said this document is, under the name and in
+                    the same grey as the rest of the metadata: it is something
+                    the app worked out, not something you typed. Suppressed when
+                    the list is grouped by class, where the heading directly
+                    above already says it. Absent rather than guessed at — an
+                    empty tag would read as a class called "". */}
+                {item.docClass !== undefined && order !== "class" && (
+                  <span className="doc-class">
+                    <TagIcon size={12} weight="regular" />
+                    {item.docClass}
+                  </span>
+                )}
                 <span className="doc-meta">
                   {busy(item) && <i className="dot busy" />}
                   {item.status === "failed" && <i className="dot failed" />}
                   {ago(t, item.addedAt)}
                   {state(t, item) !== "" && ` · ${state(t, item)}`} &middot; {summary(t, item)}
                 </span>
-                {/* What the model said this document is. Absent rather than
-                    guessed at: an empty tag would read as a class called "". */}
-                {item.docClass !== undefined && (
-                  <span className="tag doc-class">{item.docClass}</span>
-                )}
               </button>
               <button
                 className="icon-btn doc-del"
                 aria-label={t.deleteDocument(item.name)}
-                title={t.deleteDocument(item.name)}
+                data-hint={t.deleteDocument(item.name)}
                 onClick={() => onDelete(item.id)}
               >
                 <Trash size={15} weight="regular" />
@@ -177,7 +272,7 @@ export default function Sidebar({
               className={item.id === activeId ? "doc-mini active" : "doc-mini"}
               aria-label={item.name}
               aria-current={item.id === activeId}
-              title={`${item.name} · ${item.docClass ?? t.noClass} (${summary(t, item)}${
+              data-hint={`${item.name} · ${item.docClass ?? t.noClass} (${summary(t, item)}${
                 state(t, item) === "" ? "" : `, ${state(t, item)}`
               })`}
               onClick={() => onSelect(item.id)}
@@ -194,7 +289,7 @@ export default function Sidebar({
       {/* Pinned to the floor of the rail in both states, so the one thing you
           always want is always in the same place. */}
       <div className="rail-foot">
-        <button className="fab" aria-label={t.addDocument} title={t.addDocument} onClick={onAdd}>
+        <button className="fab" aria-label={t.addDocument} data-hint={t.addDocument} onClick={onAdd}>
           <Plus size={20} weight="bold" />
         </button>
       </div>

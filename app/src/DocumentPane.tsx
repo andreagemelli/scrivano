@@ -178,7 +178,7 @@ export default function DocumentPane({
               <div className="text-block" key={i}>
                 <div className="page-num">
                   {t.page(i + 1)}
-                  <span className="tag">{p.fromTextLayer ? t.fromTextLayer : t.fromOcr}</span>
+                  <span className="provenance">{p.fromTextLayer ? t.fromTextLayer : t.fromOcr}</span>
                 </div>
                 {p.lines.length === 0 && <div className="hint">{t.emptyPage}</div>}
                 {p.lines.map((l, n) => (

@@ -19,7 +19,7 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 </div>
 
-![Scrivano with the sample residency form loaded](docs/screenshot-app.png)
+![Scrivano: a residence declaration classified and extracted, with the folder it was filed in](docs/screenshot-app.png)
 
 ## What is new in 0.2.0
 
@@ -29,9 +29,16 @@ A new model, and with it a second thing the app can do.
   English. Avg F1 went from 0.22 to **0.75** on the multilingual val split.
 - **Document classification**, alongside extraction. It runs on its own, the moment a document
   finishes reading, and the answer shows up as a tag on the document.
-- **Group and sort** the document list by that tag.
-- **The interface speaks English or Italian.** English is the default now; the switch is in
-  Settings, and it also picks the language your schema keys and class names are written in.
+- **Projects.** Documents live in folders. A folder carries the language its documents are
+  written in and the classes they can be given — so it decides what a new document in it starts
+  from. A folder of Italian invoices and a folder of German forms want neither the same schema
+  nor the same class list.
+- **Group and sort** the document list by that tag, from the filter in the rail.
+- **Language is a property of the paperwork, at two scopes.** The interface speaks English or
+  Italian. Your *documents* can be in any of the model's eight, and that is the one that matters:
+  keys, descriptions and class names go into the prompt in the document's language, because that
+  is how the model was trained. A project sets it for everything filed in it; one extraction can
+  override it for the odd page that does not match its folder.
 
 ## Links
 
@@ -76,11 +83,13 @@ npm test                          # prompt contract self-check
 - **Reads** `pdf png jpg jpeg webp tif tiff`. PDFs render at 200 DPI; a page's text layer is used
   directly when it yields >50 chars, else OCR (PP-OCRv5 + Latin recognition, Rust/ONNX).
 - **Classifies on open.** One of twelve classes, asked for as soon as the text is in. There is
-  nothing to configure per run, so there is no button — turn it off, or edit the class list, in
-  Settings → Classes.
+  nothing to configure per run, so there is no button. The class list belongs to the project the
+  document was opened into — turn it off, or edit it, from the gear beside the project name.
 - **You declare the fields** as `key` + `description` rows. New docs start with a 7-field preset,
-  since the model was fine-tuned on prompts averaging seven fields. Keep the schema tight, and
-  keep it in the document's own language: that is how the model was trained.
+  drawn from the keys that language's own training rows carry most often. Keep the schema tight,
+  and set *Documents are in* to the language of the page. It is not a cosmetic setting: on an
+  Italian page an English schema invented an email address that was not on it and read the
+  postcode as a phone number, while the Italian schema returned every field correctly.
 - **Streams the JSON**, points values back at the page on hover, and flags values that appear
   nowhere on the page as likely inventions.
 - Decoding (temperature, top-k/p, max tokens, seed) is configurable; temperature 0 by default.
@@ -144,8 +153,9 @@ capped at 50 docs storing pages as base64.
 - [x] Check multilinguality still holds (italian will remain the central scope though)
 - [x] Add Document Classification pipeline
 - [ ] Add PII pipeline
-- [ ] Let a document carry its own language, instead of one setting for the whole app
+- [ ] Detect the document's language instead of being told it
 - [ ] Re-classify on demand, not only on open
+- [ ] Move documents between projects, and open a whole folder at once
 
 ## Licence
 

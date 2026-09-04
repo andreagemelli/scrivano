@@ -22,6 +22,12 @@
   --amber-soft: rgba(217, 119, 6, 0.12);
   --amber-edge: rgba(217, 119, 6, 0.34);
   --hit: rgba(29, 78, 216, 0.2);
+  /* The page image is white paper in both themes, so the marks drawn on top of
+     it must not follow the theme: in dark mode the accent went pale blue on
+     white and the app's best feature nearly disappeared. Declared here only,
+     and deliberately not overridden below. */
+  --mark: #1d4ed8;
+  --mark-fill: rgba(29, 78, 216, 0.22);
 
   --red: #b42318;
   --red-soft: rgba(180, 35, 24, 0.07);
@@ -57,7 +63,9 @@
     --ink-2: #aab4c3;
     --ink-3: #8b97a8;
     --line: #303845;
-    --line-2: #333c49;
+    /* Two steps apart, as in light. They were 1.5% apart, which quietly killed
+       every hover that distinguishes itself by border alone. */
+    --line-2: #46515f;
 
     --accent: #7aa2ff;
     --accent-hover: #93b4ff;
@@ -109,9 +117,11 @@ button, input, textarea { font: inherit; color: inherit; }
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: var(--r-pill);
-  background: var(--line-2);
+  background: var(--ink-3);
   background-clip: content-box;
 }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-2); background-clip: content-box; }
+::selection { background: var(--hit); }
 
 .grow { flex: 1 1 auto; min-width: 0; }
 
@@ -157,14 +167,14 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* One fine-tune on 149 documents: the badge is part of the name, not a boast. */
 .beta {
-  padding: 1px 6px;
+  padding: 0 6px;
   border: 1px solid var(--accent-edge);
   border-radius: var(--r-pill);
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 10px;
+  font-size: var(--t-meta);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -178,23 +188,54 @@ button, input, textarea { font: inherit; color: inherit; }
   padding: 2px 16px 12px;
   border-bottom: 1px solid var(--line);
 }
-.drawer-tabs .muted { font-size: var(--t-meta); }
+.drawer-tabs .muted { font-size: var(--t-meta); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* The language picker, in the drawer header next to the close button. A native
-   select: the OS already knows how to draw a two-item menu on every platform. */
-.lang { display: inline-flex; align-items: center; gap: 6px; flex: none; }
-.lang select {
+/* Interface language, in the drawer header. Two values, both on screen, using
+   the same .seg as every other switch in the app — which also puts it back in
+   the drawer's focus ring, since that ring is built from buttons and inputs and
+   never saw the <select> this replaced. */
+.lang button { min-width: 34px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+
+/* Document language, on the schema editor's own header row. */
+.doclang { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.doclang .muted { flex: none; }
+
+/* The app's own dropdown. Both places that had a native <select> use this: the
+   OS popup was the one control the platform drew for itself, and it looked it.
+   The floating layer is the same .popover the schema presets open. */
+.menu { display: inline-flex; min-width: 0; }
+.menu > .icon-btn { flex: none; }
+.menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
   min-height: 28px;
-  padding: 0 6px;
+  padding: 0 8px;
   border: 1px solid var(--line-2);
   border-radius: var(--r-ctl);
   background: var(--surface);
   color: var(--ink);
-  font-family: var(--sans);
   font-size: var(--t-body);
   cursor: pointer;
 }
-.lang select:hover { border-color: var(--ink-3); }
+.menu-btn:hover { border-color: var(--ink-3); background: var(--surface-2); }
+.menu-btn > svg { flex: none; color: var(--ink-3); }
+.menu-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Sized to the control rather than the 280px the presets popover wants, so it
+   fits a 240px rail; wider than the button when the names are long. */
+.menu .popover { left: 0; right: auto; width: auto; min-width: 100%; max-width: 280px; }
+.menu.right .popover { left: auto; right: 0; }
+.menu .poplist button { justify-content: flex-start; gap: 8px; }
+.menu .poplist button > span:first-child {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu .popfoot { padding: 4px; }
+.menu .popfoot .link-btn { display: inline-flex; align-items: center; gap: 6px; width: 100%; }
 
 /* A checkbox that reads as a sentence, not as a form control with a caption. */
 .toggle {
@@ -210,11 +251,50 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* Amber, and a whole sentence: this is a "you have changed something the model
    was not trained for" note, not a failure. */
+/* The stream is set exactly like the JSON that replaces it, so finishing a run
+   is a settle rather than a jump in type size, colour and box. */
+.raw.streaming {
+  padding: 0 0 0 20px;
+  border: 0;
+  background: transparent;
+  font-size: var(--t-body);
+  line-height: 1.7;
+}
+/* A ghost value after every key, so the preview has the silhouette of the
+   answer it stands in for instead of a column of dangling colons. */
+.jghost { color: var(--ink-3); }
+
+/* A named thing being named: the input is the heading it will become. */
+.named { display: flex; align-items: center; gap: 8px; }
+.name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: 500;
+}
+.name-input:focus { border-color: var(--accent); outline: none; }
+.name-input::placeholder { color: var(--ink-3); font-weight: 400; }
+
+.drawer-foot {
+  flex: none;
+  display: flex;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+/* Outlined, not filled: deleting is available, not encouraged. */
+.btn.danger { border-color: var(--red-edge); color: var(--red); background: var(--red-soft); }
+.btn.danger:hover:not(:disabled) { background: var(--red); border-color: var(--red); color: #fff; }
+
 .warn-note {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--amber-edge);
   border-radius: var(--r-ctl);
@@ -302,54 +382,109 @@ button, input, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 8px;
+  padding: 0 4px;
   border-bottom: 1px solid var(--line);
 }
 .rail.collapsed .rail-top { justify-content: center; padding: 0; }
 .rail-count { font-size: var(--t-meta); color: var(--ink-2); }
 
-/* Sorting and grouping are one question, so they are one control. Native
-   select: two platforms already know how to draw a three-item menu. */
-.rail-order {
+/* Folders, listed like folders: the thing you click is the row, and the two
+   things you do to it sit on the right where the document rows keep theirs. */
+.rail-projects {
   flex: none;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
 }
-.rail-order select {
+.folder {
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-ctl);
+}
+.folder:hover { background: var(--surface-2); }
+.folder.active { background: var(--accent-soft); border-color: var(--accent-edge); }
+.folder-main {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 26px;
-  padding: 0 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-inner);
-  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 2px 6px 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
   color: var(--ink);
-  font-family: var(--sans);
-  font-size: var(--t-meta);
+  font-size: var(--t-body);
+  text-align: left;
   cursor: pointer;
 }
-.rail-order select:hover { border-color: var(--line-2); }
+.folder-main > svg { flex: none; color: var(--ink-3); }
+.folder.active .folder-main > svg { color: var(--accent); }
+.folder-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The language the folder is in, stated on the folder. It is the setting that
+   makes a folder more than a label, so it should not need opening to see. */
+.folder-lang {
+  flex: none;
+  padding: 0 5px;
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.folder.active .folder-lang { background: var(--surface); color: var(--ink-2); }
+/* Half strength at rest rather than hidden: an action you can only find by
+   hovering does not exist on a touch screen. */
+.folder-act { width: 26px; height: 26px; opacity: 0.5; }
+.folder:hover .folder-act, .folder-act:focus-visible { opacity: 1; }
+.folder-act:disabled { opacity: 0.25; }
+.folder-act:last-child { margin-right: 4px; }
+.folder-new {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--t-body);
+  text-align: left;
+  cursor: pointer;
+}
+.folder-new:hover { background: var(--surface-2); color: var(--accent); }
+.folder-new > svg { flex: none; }
 
 /* A class heading in the grouped rail. Sticky, so scrolling a long group never
    leaves you looking at rows with no idea what they are grouped under. */
+/* Sticky, at top:0 — at -8px it slid its own first 8px under the rail's
+   padding and clipped the letters. The class is printed exactly as the model
+   returned it: upper-casing it makes it a different string from the one on
+   every card and in the class list. */
 .rail-group {
   position: sticky;
-  top: -8px;
+  top: 0;
   z-index: 1;
-  margin: 6px 0 0;
-  padding: 6px 10px 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 0 2px;
+  padding: 6px 10px 6px 10px;
   background: var(--surface);
   font-size: var(--t-meta);
   font-weight: 600;
   color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.rail-group > svg { flex: none; }
 .rail-group:first-child { margin-top: 0; }
 .rail-list {
   flex: 1 1 auto;
@@ -472,15 +607,28 @@ button, input, textarea { font: inherit; color: inherit; }
   box-shadow: var(--shadow);
   overflow: hidden;
 }
+/* Wraps rather than clips. `.panel` is overflow:hidden, so a header that ran
+   long did not scroll — it silently deleted the Copy and Download buttons off
+   the right-hand end. The soft items give way first. */
 .panel-head {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  row-gap: 2px;
   min-height: 44px;
-  padding: 0 10px 0 14px;
+  padding: 5px 10px 5px 14px;
   border-bottom: 1px solid var(--line);
 }
+.panel-head .link-btn, .panel-head .muted {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Right-aligned on whichever row they land on, so a wrap looks chosen. */
+.panel-actions { display: flex; align-items: center; gap: 8px; flex: none; margin-left: auto; }
 .panel-head h2 { margin: 0; font-size: var(--t-title); font-weight: 600; }
 .panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px; }
 .panel-foot {
@@ -493,7 +641,18 @@ button, input, textarea { font: inherit; color: inherit; }
 .muted { font-size: var(--t-meta); color: var(--ink-2); white-space: nowrap; }
 /* A "?" carrying its sentence in `title`, instead of a paragraph that sits on
    screen whether or not anyone reads it twice. */
-.help { display: inline-flex; flex: none; color: var(--ink-3); cursor: help; }
+/* A button, not a span: it carries an explanation nothing else says, so it has
+   to be reachable by keyboard as well as by pointer. */
+.help {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: help;
+}
 .help:hover { color: var(--ink-2); }
 .hint { margin: 0 0 10px; font-size: var(--t-meta); color: var(--ink-2); }
 .err {
@@ -507,28 +666,46 @@ button, input, textarea { font: inherit; color: inherit; }
   white-space: pre-wrap;
 }
 .err-text { font-size: var(--t-meta); color: var(--red); }
+/* The class the model assigned, in the topbar. Not tinted with the accent:
+   that pair is already "selected document" in the rail, so a blue chip would
+   read as a selection. It earns its weight by being ink rather than a hue. */
 .tag {
-  margin-left: 8px;
-  padding: 1px 8px;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 22ch;
+  padding: 1px 9px;
+  border: 1px solid var(--line-2);
   border-radius: var(--r-pill);
   background: var(--surface-2);
   font-size: var(--t-meta);
-  color: var(--ink-2);
-}
-/* The class the model assigned. In the rail it sits under the metadata line so
-   it never competes with the filename, and it truncates: a class name can be
-   longer than a 260px rail. Declared after .tag so the reset of its left
-   margin is the one that survives. */
-.doc-class {
-  display: inline-block;
-  max-width: 100%;
-  margin: 4px 0 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--ink);
   white-space: nowrap;
-  vertical-align: bottom;
+  overflow: hidden;
 }
+.tag > svg { flex: none; color: var(--ink-3); }
+/* The same fact in the rail, where it is one line of metadata among others and
+   the card is 240px wide: the icon carries the meaning, the grey says the app
+   worked this out rather than you typing it. */
+.doc-class {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: var(--t-meta);
+  color: var(--ink-3);
+}
+.doc-class > svg { flex: none; }
+.doc-class {
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* Where the page text came from. A footnote about provenance, so plain text —
+   it used to wear the same chip as the class, which made the model's answer
+   look like plumbing and the plumbing look like an answer. */
+.provenance { margin-left: 8px; font-size: var(--t-meta); color: var(--ink-3); }
 /* Amber, and always with words: a coloured mark alone is a state nobody reads. */
 .flag {
   display: inline-flex;
@@ -589,6 +766,13 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn.primary:disabled { background: var(--surface-2); border-color: var(--line); color: var(--ink-3); box-shadow: none; }
+/* A run in flight is not the same as a button that cannot run. Tinted rather
+   than filled is already this app's word for that, borrowed from .fab. */
+.btn.primary[data-busy]:disabled {
+  border-color: var(--accent-edge);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 
 .icon-btn {
   display: inline-flex;
@@ -643,7 +827,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .seg button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: var(--shadow-lift);
+  box-shadow: 0 0 0 1px var(--line);
 }
 
 /* Document pane */
@@ -686,9 +870,9 @@ button, input, textarea { font: inherit; color: inherit; }
 .marks { position: absolute; inset: 1px; pointer-events: none; }
 .mark {
   position: absolute;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--mark);
   border-radius: 2px;
-  background: var(--hit);
+  background: var(--mark-fill);
 }
 .text-block + .text-block { margin-top: 20px; }
 .text-block .page-num { margin-bottom: 8px; }
@@ -833,7 +1017,12 @@ button, input, textarea { font: inherit; color: inherit; }
   z-index: 11;
   display: flex;
   flex-direction: column;
-  width: min(440px, 94vw);
+  /* 440 was sized for the schema tab alone; 0.2.0 put a twelve-row class list in
+     here and the descriptions wrapped to three lines each. Fixed rather than
+     fluid on purpose: the description textareas auto-grow from a measurement
+     taken on render, so a width that changes with the window would leave them
+     clipped until the next keystroke. 94vw keeps the dev browser honest. */
+  width: min(600px, 94vw);
   border: 1px solid var(--line);
   border-right: 0;
   border-radius: var(--r-panel) 0 0 var(--r-panel);
@@ -859,41 +1048,59 @@ button, input, textarea { font: inherit; color: inherit; }
   gap: 22px;
 }
 
-.group { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.group-head { display: flex; align-items: center; gap: 8px; width: 100%; }
+/* Column, stretched. It used to be align-items:flex-start, so every full-width
+   child needed its own width:100% patch — and the one child that never got one,
+   SchemaEditor's own root, shrank to half a drawer the moment the Classes tab
+   nested it inside a second group. Stretch by default; the trailing add button
+   is the only thing that wants to be its own size, so it says so. */
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group > .btn { align-self: flex-start; }
+.group-head { display: flex; align-items: center; gap: 8px; }
 .group-head h3 { margin: 0; font-size: var(--t-title); font-weight: 600; }
 .group .hint { margin: 0; }
 
-.field-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.field {
+.field-list { display: flex; flex-direction: column; gap: 6px; }
+/* One row per entry, name beside description, and one border around the pair.
+   It used to be a bordered card holding a bordered card, which cost a nesting
+   level, ~24px of height per row, and about 290px of scroll on a twelve-class
+   list — for a box whose only job was to hold another box. */
+.field { display: grid; grid-template-columns: 1fr auto; gap: 4px 6px; align-items: start; }
+.field-body {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 10px;
   border: 1px solid var(--line);
-  border-radius: var(--r-panel);
-  background: var(--surface-2);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
 }
-.field-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
-/* One card, two borderless inputs, a hairline between them: the app has a
-   single input language and this is it. */
-.field-body { border-radius: var(--r-ctl); background: var(--surface); }
+.field-del { grid-column: 2; grid-row: 1; align-self: center; }
+.field-flag { grid-column: 1; grid-row: 2; justify-self: start; }
 .field .k, .field .d {
-  width: 100%;
   padding: 6px 8px;
   border: 0;
-  border-radius: var(--r-ctl);
   background: transparent;
   color: var(--ink);
+  font-size: var(--t-body);
 }
-.field .d { border-top: 1px solid var(--line); border-radius: 0 0 var(--r-ctl) var(--r-ctl); }
-.field .k { font-size: var(--t-body); font-weight: 500; }
-.field .d { font-size: var(--t-body); line-height: 1.45; color: var(--ink-2); resize: none; overflow: hidden; }
-.field .k:focus, .field .d:focus { outline: none; box-shadow: inset 0 -2px 0 var(--accent); }
+/* The name column is wide enough for a real key and narrow enough to leave the
+   description a readable measure at the drawer's smallest width. */
+.field .k { flex: 0 0 clamp(104px, 27%, 190px); font-weight: 500; border-radius: var(--r-ctl) 0 0 var(--r-ctl); }
+.field .d {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 var(--r-ctl) var(--r-ctl) 0;
+  line-height: 1.45;
+  color: var(--ink-2);
+  resize: none;
+  overflow: hidden;
+}
+.field-body:focus-within { border-color: var(--accent); }
+.field .k:focus, .field .d:focus { outline: none; }
 .field .k::placeholder, .field .d::placeholder { color: var(--ink-3); }
-.field-del { flex: none; }
 
-.settings { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.settings { display: flex; flex-direction: column; gap: 14px; }
 .setting { display: grid; grid-template-columns: 1fr 104px; gap: 4px 12px; align-items: center; }
 .setting-label { font-size: var(--t-body); font-weight: 500; }
 /* A control that does nothing right now should not look live. */
@@ -923,7 +1130,7 @@ button, input, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   background: var(--surface);
-  box-shadow: 0 12px 34px -14px rgba(16, 40, 90, 0.5);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .popover input, .popover textarea {
@@ -943,7 +1150,6 @@ button, input, textarea { font: inherit; color: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  display: block;
   width: 100%;
   padding: 5px 8px;
   border: 0;
@@ -957,12 +1163,40 @@ button, input, textarea { font: inherit; color: inherit; }
 .poplist .hint { margin: 6px 8px; }
 .popfoot { display: flex; align-items: center; gap: 8px; padding: 8px; border-top: 1px solid var(--line); }
 
+/* The tooltip WKWebView will not draw for us. Same floating language as the
+   popover — surface, hairline, the app's one shadow — because it is the same
+   kind of thing: a layer above the page that closes when you look away. Fixed
+   and positioned from JS, so it works inside the drawer and both scrolling
+   panes; translate centres it on its trigger without measuring it first. */
+.hint-bubble {
+  position: fixed;
+  z-index: 30;
+  max-width: 260px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink-2);
+  font-size: var(--t-meta);
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.hint-bubble.above { transform: translate(-50%, -100%); }
+
 /* Motion is functional only: the drawer says where it came from, the pulse and
    the caret say work is still happening. */
 @media (prefers-reduced-motion: no-preference) {
-  .btn, .icon-btn, .seg button, .doc-card, .doc-mini, .doc-del, .jval, .field .k, .field .d, .num, .fab {
+  .btn, .icon-btn, .seg button, .doc-card, .doc-mini, .doc-del, .jval, .field .k, .field .d, .num, .fab,
+  .link-btn, .poplist button, .menu-btn, .help, .speed, .tag, .field-body {
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
   }
+  /* The bubble appears where the pointer already is, so it fades rather than
+     arrives. No movement: a tooltip that slides is a tooltip you read late. */
+  .hint-bubble { animation: fade-in 90ms ease; }
   .drawer { animation: slide-in 200ms cubic-bezier(0.22, 0.8, 0.3, 1); }
   .scrim { animation: fade-in 200ms ease; }
   .skel-page, .skel-line, .dot.busy { animation: pulse 1.4s ease-in-out infinite; }

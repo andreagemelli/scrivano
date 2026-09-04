@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, DownloadSimple, Gauge, Question, Warning } from "@phosphor-icons/react";
+import { Copy, DownloadSimple, Question, Warning } from "@phosphor-icons/react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -10,8 +10,9 @@ import type { Doc, Field } from "./types";
 /** Rate readout. Two significant figures is all the precision this number has. */
 function Speed({ tps, live, help }: { tps: number; live: boolean; help: string }) {
   return (
-    <span className={live ? "speed live" : "speed"} title={help}>
-      <Gauge size={13} weight="regular" />
+    // No icon: "tok/s" already says what the number is, and the panel header
+    // is the tightest row in the app.
+    <span className={live ? "speed live" : "speed"} data-hint={help}>
       {tps.toFixed(tps < 10 ? 1 : 0)} tok/s
     </span>
   );
@@ -92,7 +93,7 @@ export default function Results({
             before a run and it is the way in to editing it. */}
         <button
           className="link-btn"
-          title={t.openSchema}
+          data-hint={t.openSchema}
           onClick={onSettings}
         >
           {t.schemaCount(fields.length)}
@@ -101,12 +102,9 @@ export default function Results({
         {tps !== null && <Speed tps={tps} live={extracting} help={t.speedHelp} />}
         {!extracting && result && (
           <>
-            <span
-              className="help"
-              title={t.valuesEditable}
-            >
+            <button className="help" aria-label={t.valuesEditable} data-hint={t.valuesEditable}>
               <Question size={13} weight="regular" />
-            </span>
+            </button>
             <div className="seg">
               <button aria-pressed={view === "fields"} onClick={() => setView("fields")}>
                 {t.fieldsView}
@@ -117,21 +115,23 @@ export default function Results({
             </div>
           </>
         )}
+        {/* The two actions travel together. This header wraps rather than clips,
+            and a lone download button on a second row reads as a mistake. */}
         {text !== "" && (
-          <>
+          <span className="panel-actions">
             {copied && <span className="muted">{t.copied}</span>}
-            <button className="icon-btn" aria-label={t.copyJson} title={t.copyJson} onClick={copy}>
+            <button className="icon-btn" aria-label={t.copyJson} data-hint={t.copyJson} onClick={copy}>
               <Copy size={16} weight="regular" />
             </button>
             <button
               className="icon-btn"
               aria-label={t.downloadJson}
-              title={t.downloadJson}
+              data-hint={t.downloadJson}
               onClick={download}
             >
               <DownloadSimple size={16} weight="regular" />
             </button>
-          </>
+          </span>
         )}
       </header>
 
@@ -159,7 +159,8 @@ export default function Results({
                 {fields.map((f) => (
                   <div className="preview-row" key={f.key}>
                     <span className="jkey">"{f.key}"</span>
-                    <span>:</span>
+                    <span className="jpunct">:</span>
+                    <span className="jghost">""</span>
                   </div>
                 ))}
                 <div className="brace">{"}"}</div>
@@ -171,7 +172,9 @@ export default function Results({
         {extracting && (
           <>
             <p className="hint">{t.modelReading}</p>
-            <pre className="raw">
+            {/* Set exactly like the JSON that replaces it, so finishing a run
+                is a settle rather than a jump in size, colour and box. */}
+            <pre className="raw streaming">
               {stream}
               <span className="caret" />
             </pre>
@@ -200,7 +203,7 @@ export default function Results({
                       onBlur={() => onHover(null)}
                     />
                     {!isGrounded(value, lines) && (
-                      <span className="flag" title={t.notOnPageHelp}>
+                      <span className="flag" data-hint={t.notOnPageHelp}>
                         <Warning size={13} weight="regular" />
                         {t.notOnPage}
                       </span>
@@ -261,7 +264,7 @@ export default function Results({
                         strands a comma on a line of its own. */}
                     <span className="jquote">"{i < keys.length - 1 ? "," : ""}</span>
                     {!grounded && (
-                      <span className="flag" title={t.notOnPageHelp}>
+                      <span className="flag" data-hint={t.notOnPageHelp}>
                         <Warning size={13} weight="regular" />
                         {t.notOnPage}
                       </span>

@@ -39,14 +39,22 @@ cargo test --manifest-path src-tauri/Cargo.toml   # end-to-end decode + OCR, nee
 
 | | |
 |---|---|
-| `src/prompt.ts` | The model contract. Mirrors `local/data.py` byte for byte. **Look here first** if extraction quality is wrong — it is the only place the prompt is built. |
+| `src/prompt.ts` | The model contract. Mirrors `local/make_docai.py` byte for byte. **Look here first** if extraction or classification quality is wrong — it is the only place a prompt is built. |
 | `src/prompt.test.ts` | The check that keeps `prompt.ts` and the training format in step. |
-| `src/schema.json` | The 35 trained keys and their English descriptions. These are prompt text, not UI copy: they stay in English. |
+| `src/schemas.json` | Every trained key per language, key → description, both written in the document's own language. Lifted verbatim from `local/xfund-docai-xl`. Prompt text, not UI copy. |
+| `src/classes.json` | The twelve document classes, each with a name and a description per language. Same provenance, same rule. |
+| `src/catalog.ts` | What the two files above mean: the seven-key presets per language, the class list, and the table that resolves a class the model named in another language. |
+| `src/i18n.ts` | Every word of UI, in both interface languages. English is the source of truth; Italian is typed against it. |
+| `src/LangPicker.tsx` | The eight document languages, named in themselves. One control at two scopes: a folder's default, and one extraction's override. |
+| `src/ProjectPanel.tsx` | One folder's settings: its name, the language its documents are in, and how they get classified. Classification is a property of a batch, not of the model or of one document, which is why it is not in the extraction settings. |
+| `src/Menu.tsx` | The app's own dropdown, over the same popover the schema presets use. Replaced the two native `<select>`s, which were the only controls the OS drew for itself. |
+| `src/Hints.tsx` | Tooltips. WKWebView draws no `title`, so every explanation in the app was invisible in the shipped build until this existed. |
 | `src/pdf.ts` | Rendering, text-layer extraction, line merging, the OCR fallback. |
 | `src/App.tsx` | Shell, document state, the extraction run and the tok/s measurement. |
 | `src/Logo.tsx` | The mark. Same geometry as `icons/scrivano.svg`; edit both together. |
 | `src-tauri/src/llm.rs` | llama.cpp decode loop and the sampler chain. |
 | `src-tauri/src/ocr.rs` | PP-OCRv5 through `oar-ocr`, boxes normalised to 0..1. |
+| `scripts/ui-shots.mjs` | Screenshots of every UI state in WebKit, by faking `window.__TAURI_INTERNALS__`. Needs `npm i -D --no-save playwright`; not part of `npm test`. |
 
 The UI is Italian. Field descriptions and the system prompt are not — they are what the model was
 fine-tuned on.

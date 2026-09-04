@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Gear, Play, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowRight, Gear, Play, Tag as TagIcon, WarningCircle, X } from "@phosphor-icons/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { backendStatus, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
-import { DEFAULT_PREFS, loadDocs, loadPrefs, saveDocs, savePrefs } from "./store";
+import { DEFAULT_PREFS, FIRST_PROJECT, loadDocs, loadPrefs, saveDocs, savePrefs } from "./store";
 import { buildPrompt, parseAnswer, parseClass } from "./prompt";
-import { classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
+import { classAlias, classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
 import { DICTS, Words } from "./i18n";
+import Hints from "./Hints";
 import Logo from "./Logo";
 import Sidebar from "./Sidebar";
 import DocumentPane from "./DocumentPane";
 import SettingsPanel from "./SettingsPanel";
+import ProjectPanel from "./ProjectPanel";
 import Results from "./Results";
 import { CLASSIFY_SAMPLING, DEFAULT_SAMPLING } from "./types";
 import type { Dict } from "./i18n";
-import type { Doc, Field, Lang, Page, Sampling, Status } from "./types";
+import type { Doc, DocLang, Field, Lang, Page, Project, Sampling, Status } from "./types";
 
 /** Classification streams into nothing: one short object, no live view of it. */
 const noop = () => {};
@@ -79,12 +81,15 @@ export default function App() {
   const [speed, setSpeed] = useState<number | null>(null);
   const [backend, setBackend] = useState<{ ok: boolean; detail: string } | null>(null);
   const [lang, setLang] = useState<Lang>(DEFAULT_PREFS.lang);
-  const [classify, setClassify] = useState(DEFAULT_PREFS.classify);
-  const [classes, setClasses] = useState<Field[]>(DEFAULT_PREFS.classes);
+  const [projects, setProjects] = useState<Project[]>(DEFAULT_PREFS.projects);
+  const [projectId, setProjectId] = useState(DEFAULT_PREFS.activeProjectId);
+  const [editingProject, setEditingProject] = useState(false);
   // The schema belongs to what you want, not to a file, so it exists before any
   // document does and a new document inherits whatever is on screen. Sampling
   // works the same way.
-  const [draft, setDraft] = useState<Field[]>(() => defaultFields(DEFAULT_PREFS.lang));
+  const [draft, setDraft] = useState<Field[]>(() => defaultFields(DEFAULT_PREFS.projects[0].docLang));
+  /** The draft's language: what the next document in this folder starts from. */
+  const [draftLang, setDraftLang] = useState<DocLang>(DEFAULT_PREFS.projects[0].docLang);
   const [draftSampling, setDraftSampling] = useState<Sampling>(DEFAULT_SAMPLING);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState("");
@@ -97,17 +102,37 @@ export default function App() {
   const gearRef = useRef<HTMLButtonElement>(null);
 
   const t = DICTS[lang];
-  const doc = docs.find((d) => d.id === activeId) ?? null;
+  // Documents saved before projects existed belong to the first one, which is
+  // also where a deleted project's documents go: there is always a home.
+  const project = projects.find((p) => p.id === projectId) ?? projects[0];
+  const inProject = docs.filter((d) => projectOf(d) === project.id);
+  const doc = inProject.find((d) => d.id === activeId) ?? null;
+  // The language of what is on screen: this document's own if it has one, the
+  // folder's otherwise. Everything the drawer shows — presets, the untrained
+  // flag — reads it, and so does the next extraction.
+  const docLang = doc?.docLang ?? (doc ? project.docLang : draftLang);
+  const counts = Object.fromEntries(
+    projects.map((p) => [p.id, docs.filter((d) => projectOf(d) === p.id).length]),
+  );
   const fields = doc ? doc.fields : draft;
   const sampling = doc ? (doc.sampling ?? DEFAULT_SAMPLING) : draftSampling;
 
-  // The drag listener is registered once, so it reads the live values here.
-  const newDocDefaults = useRef({ fields, sampling });
-  newDocDefaults.current = { fields, sampling };
-  // addPath runs from a listener registered once, so the classification
-  // settings have to be read at call time, not captured at mount.
-  const classifier = useRef({ classify, classes });
-  classifier.current = { classify, classes };
+  // The drag listener is registered once, so everything addPath needs is read
+  // through refs at call time rather than captured at mount.
+  //
+  // A new document inherits the DRAFT schema, not the selected document's. They
+  // used to be the same value, which meant selecting an old document quietly
+  // made its schema the template for every file dropped afterwards — and since a
+  // document saved by 0.1.x carries the 0.1.x vocabulary, one such document in
+  // the history was enough for the old keys to propagate forever.
+  const newDocDefaults = useRef({ fields: draft, sampling: draftSampling });
+  newDocDefaults.current = { fields: draft, sampling: draftSampling };
+  const classifier = useRef<{ project: Project | undefined; docLang: DocLang; projectId: string }>({
+    project: projects[0],
+    docLang,
+    projectId,
+  });
+  classifier.current = { project: projects.find((p) => p.id === projectId), docLang, projectId };
   // Same reason: the drop handler needs the current words, not the ones that
   // were on screen when it was registered.
   const words = useRef(t);
@@ -120,18 +145,24 @@ export default function App() {
       // after the first paint. A document dropped in that window is already in
       // state, and assigning the disk copy over it threw it away silently, so
       // the two are merged and whatever is on screen keeps the selection.
-      setDocs((cur) => (cur === INITIAL ? d : [...cur, ...d]));
-      setActiveId((cur) => cur ?? d[0]?.id ?? null);
+      setDocs((cur) => (cur === INITIAL ? d : merge(cur, d)));
+      // Deliberately does not select one. A stored document carries the schema
+      // it was run with, possibly from an older version of the app, and opening
+      // on it presents that schema as though it were today's preset.
     });
     loadPrefs().then((p) => {
       setLang(p.lang);
-      setClassify(p.classify);
-      setClasses(p.classes);
-      // The draft schema is the English preset and nobody has touched it yet,
-      // so it becomes the stored language's preset rather than staying a mix.
-      if (p.lang !== DEFAULT_PREFS.lang) {
+      setProjects(p.projects);
+      setProjectId(p.activeProjectId);
+      const home = p.projects.find((x) => x.id === p.activeProjectId) ?? p.projects[0];
+      setDraftLang(home.docLang);
+      // The draft is still the untouched default preset, so it becomes the
+      // stored folder's preset rather than staying a mix.
+      if (home.docLang !== DEFAULT_PREFS.projects[0].docLang) {
         setDraft((cur) =>
-          sameKeys(cur, defaultFields(DEFAULT_PREFS.lang)) ? defaultFields(p.lang) : cur,
+          sameKeys(cur, defaultFields(DEFAULT_PREFS.projects[0].docLang))
+            ? defaultFields(home.docLang)
+            : cur,
         );
       }
     });
@@ -164,26 +195,92 @@ export default function App() {
     return () => clearTimeout(t);
   }, [docs]);
 
+  const prefs = { lang, projects, activeProjectId: projectId };
+
   function changeLanguage(next: Lang) {
-    // An untouched list follows the language, an edited one does not: the
-    // second is work someone did, and silently replacing it loses it.
-    const nextClasses = sameKeys(classes, defaultClasses(lang))
-      ? defaultClasses(next)
-      : classes;
     setLang(next);
-    setClasses(nextClasses);
-    void savePrefs({ lang: next, classify, classes: nextClasses });
-    if (sameKeys(fields, defaultFields(lang))) setFields(defaultFields(next));
+    void savePrefs({ ...prefs, lang: next });
   }
 
-  function changeClassify(next: boolean) {
-    setClassify(next);
-    void savePrefs({ lang, classify: next, classes });
+  /**
+   * The language of THIS extraction, which may differ from its folder's. Only
+   * an untouched schema follows it: an edited one is work someone did.
+   */
+  function changeDocLang(next: DocLang) {
+    if (sameKeys(fields, defaultFields(docLang))) setFields(defaultFields(next));
+    if (doc) patch(doc.id, { docLang: next });
+    // The draft language follows either way, because setFields writes the draft
+    // either way: letting them disagree meant the next folder you opened saw a
+    // draft whose keys were one language and whose language said another.
+    setDraftLang(next);
   }
 
-  function changeClasses(next: Field[]) {
-    setClasses(next);
-    void savePrefs({ lang, classify, classes: next });
+  /**
+   * A folder's own settings. Its language decides what a new document in here
+   * starts from, so changing it moves the class list and the draft schema with
+   * it — but only while they are still the untouched defaults.
+   */
+  function changeProject(next: Project) {
+    const was = projects.find((p) => p.id === next.id);
+    const moved = was !== undefined && was.docLang !== next.docLang;
+    const settled =
+      moved && sameKeys(next.classes, defaultClasses(was.docLang))
+        ? { ...next, classes: defaultClasses(next.docLang) }
+        : next;
+    const nextProjects = projects.map((p) => (p.id === settled.id ? settled : p));
+    setProjects(nextProjects);
+    void savePrefs({ ...prefs, projects: nextProjects });
+    if (moved && settled.id === projectId) {
+      if (sameKeys(draft, defaultFields(was.docLang))) setDraft(defaultFields(settled.docLang));
+      setDraftLang(settled.docLang);
+    }
+  }
+
+  function chooseProject(id: string) {
+    const next = projects.find((p) => p.id === id);
+    if (!next) return;
+    setProjectId(id);
+    setActiveId(null);
+    // A folder you switch into brings its own language, and with it the schema
+    // the next document starts from — as long as nobody has edited the draft.
+    if (sameKeys(draft, defaultFields(draftLang))) setDraft(defaultFields(next.docLang));
+    setDraftLang(next.docLang);
+    void savePrefs({ ...prefs, activeProjectId: id });
+  }
+
+  function addProject(name: string) {
+    // A new folder starts in the language of the one you were in: most people
+    // making a second folder are still working in the same paperwork.
+    const next = {
+      id: crypto.randomUUID(),
+      name,
+      docLang: project.docLang,
+      classify: true,
+      classes: defaultClasses(project.docLang),
+    };
+    const nextProjects = [...projects, next];
+    setProjects(nextProjects);
+    setProjectId(next.id);
+    setActiveId(null);
+    void savePrefs({ ...prefs, projects: nextProjects, activeProjectId: next.id });
+    setEditingProject(true);
+  }
+
+  /**
+   * The folder goes; its documents do not. They move to the first project,
+   * because a document you spent a model run on should not be deleted by a
+   * decision about filing.
+   */
+  function removeProject(id: string) {
+    if (projects.length < 2) return;
+    const nextProjects = projects.filter((p) => p.id !== id);
+    const home = nextProjects[0].id;
+    setDocs((ds) => ds.map((d) => (projectOf(d) === id ? { ...d, projectId: home } : d)));
+    setProjects(nextProjects);
+    setProjectId(home);
+    setActiveId(null);
+    setEditingProject(false);
+    void savePrefs({ ...prefs, projects: nextProjects, activeProjectId: home });
   }
 
   function toggleRail() {
@@ -215,6 +312,7 @@ export default function App() {
         pages: [],
         fields: newDocDefaults.current.fields,
         sampling: newDocDefaults.current.sampling,
+        projectId: classifier.current.projectId,
         status: "reading",
       },
       ...ds,
@@ -242,16 +340,22 @@ export default function App() {
    * extracts. It just opens without a class.
    */
   async function classifyDoc(id: string, pages: Page[]) {
-    const { classify, classes } = classifier.current;
+    const { project, docLang } = classifier.current;
+    const classes = project?.classes ?? [];
     const lines = pages.flatMap((p) => p.lines.map((l) => l.text));
-    if (!classify || classes.length === 0 || lines.length === 0 || !inTauri) {
+    if (!project?.classify || classes.length === 0 || lines.length === 0 || !inTauri) {
       patch(id, { pages, status: "ready" });
       return;
     }
     patch(id, { pages, status: "classifying" });
     try {
       const raw = await extract(buildPrompt("classify", classes, lines), CLASSIFY_SAMPLING, noop);
-      patch(id, { status: "ready", docClass: parseClass(raw, classes) ?? undefined });
+      const picked = parseClass(raw, classes, classAlias(docLang));
+      // An answer nobody can place is worth saying out loud: a silently dropped
+      // one is indistinguishable from classification being switched off, which
+      // is exactly how a 100% failure rate went unnoticed.
+      if (picked === null) console.warn("classification answered off the list:", raw.trim());
+      patch(id, { status: "ready", docClass: picked ?? undefined });
     } catch (e) {
       console.error("classification failed", e);
       patch(id, { status: "ready" });
@@ -312,14 +416,23 @@ export default function App() {
     if (id === activeId) setActiveId(docs.find((d) => d.id !== id)?.id ?? null);
   }
 
+  /**
+   * An edit goes to two places, and they mean different things.
+   *
+   * `doc.fields` is the record of the prompt this document was run with, so the
+   * saved result stays readable against the schema that produced it. The draft
+   * is the schema you are building — the one the next document inherits. Writing
+   * only the document made the draft dead state the moment anything was
+   * selected; writing only the draft threw the edit away for the open document.
+   */
   function setFields(next: Field[]) {
+    setDraft(next);
     if (doc) patch(doc.id, { fields: next });
-    else setDraft(next);
   }
 
   function setSampling(next: Sampling) {
+    setDraftSampling(next);
     if (doc) patch(doc.id, { sampling: next });
-    else setDraftSampling(next);
   }
 
   async function runExtract() {
@@ -378,19 +491,24 @@ export default function App() {
             <Logo size={19} />
             Scrivano
             {/* A 350M model on eight languages. Say so where it cannot be missed. */}
-            <span className="beta" title={t.betaTitle}>
+            <span className="beta" data-hint={t.betaTitle}>
               beta
             </span>
           </span>
           {doc && (
-            <span className="topbar-doc" title={doc.name}>
+            <span className="topbar-doc" data-hint={doc.name}>
               {doc.name}
             </span>
           )}
           {/* The class travels with the document name, so it is on screen with
               the rail collapsed too. Nothing is drawn before an answer: an
               empty tag would read as a class the model chose. */}
-          {doc?.docClass !== undefined && <span className="tag">{doc.docClass}</span>}
+          {doc?.docClass !== undefined && (
+            <span className="tag class-tag" data-hint={t.classHelp}>
+              <TagIcon size={12} weight="regular" />
+              {doc.docClass}
+            </span>
+          )}
           <span className={`pill status-${status}`}>
             <i className={dotClass(status)} />
             {/* "Ready" next to a button saying the model cannot run is a lie, and
@@ -399,14 +517,18 @@ export default function App() {
           </span>
           <span className="grow" />
           {reason !== "" && (
-            <span className="reason" title={reason}>
+            <span className="reason" data-hint={reason}>
               {reason}
             </span>
           )}
           <button
             className="btn primary"
             disabled={reason !== ""}
-            title={reason === "" ? t.runExtraction : reason}
+            // Working and blocked were the same grey button. Tinted-not-filled
+            // is already this app's word for "the accent action, not pressable
+            // right now", so busy borrows it and blocked keeps the grey.
+            data-busy={status === "extracting" || undefined}
+            data-hint={reason === "" ? t.runExtraction : reason}
             onClick={runExtract}
           >
             <Play size={14} weight="fill" />
@@ -416,7 +538,7 @@ export default function App() {
             ref={gearRef}
             className="btn"
             aria-expanded={settings}
-            title={t.settingsTitle}
+            data-hint={t.settingsTitle}
             onClick={() => setSettings(true)}
           >
             <Gear size={16} weight="regular" />
@@ -433,7 +555,7 @@ export default function App() {
             <button
               className="icon-btn"
               aria-label={t.dismissWarning}
-              title={t.close}
+              data-hint={t.close}
               onClick={() => setHushed(true)}
             >
               <X size={14} weight="regular" />
@@ -443,7 +565,14 @@ export default function App() {
 
         <div className="workspace">
           <Sidebar
-            docs={docs}
+            docs={inProject}
+            projects={projects}
+            project={project}
+            counts={counts}
+            onProject={chooseProject}
+            onNewProject={() => addProject(t.newProjectName)}
+            onEditProject={() => setEditingProject(true)}
+            onDeleteProject={removeProject}
             activeId={activeId}
             open={railOpen}
             onToggle={toggleRail}
@@ -477,26 +606,63 @@ export default function App() {
           </main>
         </div>
 
+        {/* One bubble for the whole app. WKWebView draws no `title` tooltip, so
+            every explanation in this UI was invisible in the shipped build. */}
+        <Hints />
+
         {settings && (
           <SettingsPanel
             fields={fields}
-            known={schemaFor(lang)}
+            known={schemaFor(docLang)}
             onFields={setFields}
             sampling={sampling}
             onSampling={setSampling}
             lang={lang}
             onLang={changeLanguage}
-            classify={classify}
-            onClassify={changeClassify}
-            classes={classes}
-            trainedClasses={classesFor(lang)}
-            onClasses={changeClasses}
+            docLang={docLang}
+            onDocLang={changeDocLang}
             onClose={closeSettings}
+          />
+        )}
+
+        {editingProject && (
+          <ProjectPanel
+            project={project}
+            trainedClasses={classesFor(project.docLang)}
+            count={inProject.length}
+            canDelete={projects.length > 1}
+            onChange={changeProject}
+            onDelete={() => removeProject(project.id)}
+            onClose={() => setEditingProject(false)}
           />
         )}
       </div>
     </Words.Provider>
   );
+}
+
+/** Where a document lives. History written before projects existed is in the first. */
+function projectOf(d: Doc): string {
+  return d.projectId ?? FIRST_PROJECT;
+}
+
+/**
+ * The stored history folded into what is already on screen, by id.
+ *
+ * This has to be idempotent, and it was not. StrictMode mounts the effect twice
+ * in a development build, both loads resolve, and appending the history onto a
+ * state that already held it doubled the list — then the debounced save wrote
+ * the doubled list back, so every `npm run tauri dev` launch doubled it again:
+ * one document became two, then four, then eight. What you saw was one file
+ * listed eleven times.
+ *
+ * Returns `cur` unchanged when there is nothing new, so a second load is not
+ * even a new array identity and cannot trigger a pointless megabyte write.
+ */
+function merge(cur: Doc[], stored: Doc[]): Doc[] {
+  const seen = new Set(cur.map((d) => d.id));
+  const add = stored.filter((d) => !seen.has(d.id));
+  return add.length === 0 ? cur : [...cur, ...add];
 }
 
 /** Two schemas naming the same keys in the same order: nobody has edited this one. */

@@ -102,19 +102,34 @@ export function parseAnswer(
 /**
  * The one class the model picked, or null.
  *
- * Classification answers `{"class": "<name>"}` with a name off the list it was
- * handed. A name that is not on that list is not a class the caller can act on
- * — it is the model paraphrasing, or answering in the wrong language — so it is
- * rejected rather than shown as a result. Matching is case-insensitive: the
- * class names are lowercase in the dataset and the model occasionally
- * capitalises one.
+ * Classification answers `{"class": "<name>"}`, and the name it answers with is
+ * in the DOCUMENT's language — not necessarily the language of the list it was
+ * handed. Point it at an Italian page while showing it the English list and it
+ * says "dichiarazione": the right class, named in the wrong language. Matching
+ * only against the handed list threw every one of those away, which is what made
+ * classification look broken for anyone whose documents are not in English.
+ *
+ * So: the handed list first, then `alias` — every trained class name in every
+ * language, mapped back to the name this list uses. Anything neither knows is
+ * the model paraphrasing or inventing, and is still rejected, so an edited class
+ * list keeps behaving. Matching is case-insensitive: the names are lowercase in
+ * the dataset and the model occasionally capitalises one.
  */
-export function parseClass(raw: string, classes: Field[]): string | null {
+export function parseClass(
+  raw: string,
+  classes: Field[],
+  alias: Record<string, string> = {},
+): string | null {
+  const known = new Set(classes.map((c) => c.key.trim().toLowerCase()));
   const byName = new Map(classes.map((c) => [c.key.trim().toLowerCase(), c.key]));
   let picked: string | null = null;
   object(raw, (_out, k, v) => {
     if (k !== "class" || picked !== null || typeof v !== "string") return;
-    picked = byName.get(v.trim().toLowerCase()) ?? null;
+    const said = v.trim().toLowerCase();
+    // The alias only resolves to a name the caller is actually offering, so a
+    // class removed from the list stays removed however the model names it.
+    const translated = alias[said]?.trim().toLowerCase();
+    picked = byName.get(said) ?? (translated && known.has(translated) ? byName.get(translated)! : null);
   });
   return picked;
 }

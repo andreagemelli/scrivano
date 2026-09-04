@@ -12,3 +12,7 @@ wheels/
 # local files
 local
 .DS_Store
+
+# Regenerated on demand by app/scripts/ui-shots.mjs; 9 MB of retina PNGs is not
+# repository content. docs/screenshot-app.png, the README image, is committed.
+docs/shots
