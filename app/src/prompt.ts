@@ -1,29 +1,55 @@
 /**
- * The model contract. Mirrors local/data.py byte for byte.
+ * The model contract. Mirrors local/make_docai.py byte for byte.
  *
- * Verified against the published dataset andreagemelli/xfund-kie-it (val split,
- * row it_val_0): the system message is SYSTEM_PROMPT_DEFAULT followed by one
- * "key: description.\n" per field, and the user message is the page lines
- * joined with "\n".
+ * Both tasks open with the same header and diverge on one line, exactly as in
+ * the published dataset andreagemelli/xfund-docai-xl. Verified against val row
+ * it_val_0: the system message is the header, the task line, the instructions
+ * and one "key: description.\n" per schema entry; the user message is the page
+ * lines joined with "\n".
  *
- * If extraction quality is wrong, look here first. This is the only place the
- * prompt is built.
+ * If extraction or classification quality is wrong, look here first. This is the
+ * only place a prompt is built.
  */
-import type { Field } from "./types";
+import type { Field, Task } from "./types";
 
-/** const.py SYTEM_PROMPT_DEFAULT. 127 chars, ends with two newlines. Do not trim. */
-const SYSTEM_PROMPT_DEFAULT =
-  "Identify and extract information matching the following schema.\n" +
-  "Return data as a JSON object. Missing data should be omitted.\n\n";
+/** make_docai.py SYSTEM_HEADER. No trailing newline: the task line adds it. */
+const HEADER = "You are an expert document analysis model.";
+
+/** make_docai.py KIE_INSTRUCTIONS. Ends with "Schema:\n". Do not reflow. */
+const KIE =
+  "Return a JSON object with exactly the keys listed below, in the same order. " +
+  "Every value must be copied verbatim from the document. Omit a key whose value " +
+  "is absent.\n\nSchema:\n";
+
+/** make_docai.py CLS_INSTRUCTIONS. Ends with "Classes:\n". Do not reflow. */
+const CLS =
+  'Assign the document to exactly one of the classes listed below. ' +
+  'Answer with a JSON object of the form {"class": "<class>"}.\n\nClasses:\n';
+
+/** The literal the model was trained to see after "Task: ". */
+const TASK_LINE: Record<Task, string> = {
+  extract: "information extraction",
+  classify: "document classification",
+};
 
 /**
- * System message content. Descriptions carry no terminal period in schema.json,
- * so exactly one "." is appended, then a newline. Nothing separates the lines.
+ * System message content for either task.
+ *
+ * Both listings are one "name: description.\n" per entry, with no separator and
+ * exactly one appended ".", since neither schemas.json nor classes.json carries
+ * a terminal period. Keys, descriptions and class names must be in the
+ * document's own language: that is how the model was trained, and mixing
+ * languages inside one prompt is a distribution shift.
+ *
+ * The training set shuffled the class listing per example so position could not
+ * predict the answer. At inference there is nothing to defend against and a
+ * fixed order keeps a greedy run reproducible, so the caller's order stands.
  */
-export function buildSystem(fields: Field[]): string {
+export function buildSystem(task: Task, entries: Field[]): string {
   return (
-    SYSTEM_PROMPT_DEFAULT +
-    fields.map((f) => `${f.key}: ${f.description}.\n`).join("")
+    `${HEADER}\nTask: ${TASK_LINE[task]}\n` +
+    (task === "extract" ? KIE : CLS) +
+    entries.map((f) => `${f.key}: ${f.description}.\n`).join("")
   );
 }
 
@@ -40,11 +66,11 @@ export function buildSystem(fields: Field[]): string {
  * was trained on raw XFUND entity order, so "fixing" the reading order is a
  * distribution shift, not an improvement.
  */
-export function buildPrompt(fields: Field[], lines: string[]): string {
+export function buildPrompt(task: Task, entries: Field[], lines: string[]): string {
   return (
     "<|startoftext|>" +
     "<|im_start|>system\n" +
-    buildSystem(fields) +
+    buildSystem(task, entries) +
     "<|im_end|>\n" +
     "<|im_start|>user\n" +
     lines.join("\n") +
@@ -64,6 +90,46 @@ export function parseAnswer(
   fields: Field[],
 ): Record<string, string> | null {
   const wanted = new Set(fields.map((f) => f.key));
+  const keep = (out: Record<string, string>, k: string, v: unknown) => {
+    if (!wanted.has(k)) return; // the model invents keys now and then
+    if (v === null || v === undefined || v === "") return; // "Omit a key whose value is absent"
+    if (k in out) return; // a repetition loop repeats keys; the first answer is the considered one
+    out[k] = typeof v === "string" ? v : String(v);
+  };
+  return object(raw, keep);
+}
+
+/**
+ * The one class the model picked, or null.
+ *
+ * Classification answers `{"class": "<name>"}` with a name off the list it was
+ * handed. A name that is not on that list is not a class the caller can act on
+ * — it is the model paraphrasing, or answering in the wrong language — so it is
+ * rejected rather than shown as a result. Matching is case-insensitive: the
+ * class names are lowercase in the dataset and the model occasionally
+ * capitalises one.
+ */
+export function parseClass(raw: string, classes: Field[]): string | null {
+  const byName = new Map(classes.map((c) => [c.key.trim().toLowerCase(), c.key]));
+  let picked: string | null = null;
+  object(raw, (_out, k, v) => {
+    if (k !== "class" || picked !== null || typeof v !== "string") return;
+    picked = byName.get(v.trim().toLowerCase()) ?? null;
+  });
+  return picked;
+}
+
+/**
+ * The first balanced JSON object in `raw`, fed pair by pair to `keep`.
+ *
+ * Shared by both tasks because both answer with one object and both get the
+ * same slop back: a code fence, a sentence after the closing brace, an object
+ * the model never closed. Returns null when `keep` accepted nothing.
+ */
+function object(
+  raw: string,
+  keep: (out: Record<string, string>, k: string, v: unknown) => void,
+): Record<string, string> | null {
   const body = raw.replace(/^```(?:json)?/i, "").replace(/```\s*$/, "").trim();
 
   const start = body.indexOf("{");
@@ -94,12 +160,6 @@ export function parseAnswer(
       break;
     }
   }
-  const keep = (out: Record<string, string>, k: string, v: unknown) => {
-    if (!wanted.has(k)) return; // the model invents keys now and then
-    if (v === null || v === undefined || v === "") return; // "Missing data should be omitted"
-    if (k in out) return; // a repetition loop repeats keys; the first answer is the considered one
-    out[k] = typeof v === "string" ? v : String(v);
-  };
 
   if (end >= 0) {
     let obj: unknown;

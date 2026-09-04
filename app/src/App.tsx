@@ -6,14 +6,19 @@ import { backendStatus, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
 import { loadDocs, saveDocs } from "./store";
 import { buildPrompt, parseAnswer } from "./prompt";
+import { defaultFields, schemaFor } from "./catalog";
 import Logo from "./Logo";
 import Sidebar from "./Sidebar";
 import DocumentPane from "./DocumentPane";
-import { defaultFields } from "./SchemaEditor";
 import SettingsPanel from "./SettingsPanel";
 import Results from "./Results";
 import { DEFAULT_SAMPLING } from "./types";
-import type { Doc, Field, Sampling, Status } from "./types";
+import type { Doc, Field, Lang, Sampling, Status } from "./types";
+
+// The language the schema and the class names are written in. The model wants
+// them in the document's own language; the switch that makes this a setting
+// lands with the interface translation.
+const LANG: Lang = "it";
 
 const EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp", "tif", "tiff"];
 
@@ -28,6 +33,7 @@ const INITIAL: Doc[] = [];
 const STATUS_LABEL: Record<Status, string> = {
   empty: "Nessun documento",
   reading: "Lettura",
+  classifying: "Classificazione",
   ready: "Pronto",
   extracting: "Estrazione",
   done: "Completato",
@@ -36,7 +42,7 @@ const STATUS_LABEL: Record<Status, string> = {
 
 /** Every state gets a dot; only the two working ones pulse. */
 function dotClass(s: Status): string {
-  if (s === "reading" || s === "extracting") return "dot busy";
+  if (s === "reading" || s === "extracting" || s === "classifying") return "dot busy";
   if (s === "failed") return "dot failed";
   return "dot";
 }
@@ -57,6 +63,7 @@ function blocker(
 ): string {
   if (!doc) return "Aggiungi prima un documento";
   if (doc.status === "reading") return "Lettura del documento in corso";
+  if (doc.status === "classifying") return "Classificazione in corso";
   if (doc.status === "extracting") return "Estrazione già in corso";
   if (doc.pages.every((p) => p.lines.length === 0))
     return "Nessun testo trovato in questo documento";
@@ -89,7 +96,7 @@ export default function App() {
   // The schema belongs to what you want, not to a file, so it exists before any
   // document does and a new document inherits whatever is on screen. Sampling
   // works the same way.
-  const [draft, setDraft] = useState<Field[]>(defaultFields);
+  const [draft, setDraft] = useState<Field[]>(() => defaultFields(LANG));
   const [draftSampling, setDraftSampling] = useState<Sampling>(DEFAULT_SAMPLING);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState("");
@@ -272,7 +279,7 @@ export default function App() {
     let tps: number | undefined;
     try {
       let acc = "";
-      const raw = await extract(buildPrompt(doc.fields, lines), sampling, (t) => {
+      const raw = await extract(buildPrompt("extract", doc.fields, lines), sampling, (t) => {
         acc += t;
         setStream(acc);
         if (n === 0) started = performance.now();
@@ -401,6 +408,7 @@ export default function App() {
       {settings && (
         <SettingsPanel
           fields={fields}
+          known={schemaFor(LANG)}
           onFields={setFields}
           sampling={sampling}
           onSampling={setSampling}

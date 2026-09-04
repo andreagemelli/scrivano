@@ -77,7 +77,7 @@ jobs:
         working-directory: app
         run: npm ci
 
-      # The OCR graphs and the GGUF are gitignored and add up to 231 MiB, which
+      # The OCR graphs and the GGUF are gitignored and add up to 374 MiB, which
       # is the slowest step in the job. They are pinned files at pinned repos, so
       # the fetch script is the only thing that can change what lands here.
       - name: Cache bundled resources
@@ -121,7 +121,7 @@ jobs:
             SmartScreen segnala un editore sconosciuto: "Ulteriori informazioni"
             poi "Esegui comunque".
 
-            Il modello (219 MiB) è già dentro l'installer: dopo l'installazione
+            Il modello (362 MiB) è già dentro l'installer: dopo l'installazione
             non serve rete.
           # A draft release is visible only to accounts with push access, so it
           # is not a download link for anyone else. Published, and flagged as a

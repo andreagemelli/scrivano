@@ -4,7 +4,7 @@
 set -euo pipefail
 
 RES="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/resources"
-# Point LFM_GGUF at a local Q4_K_M file to skip the download.
+# Point LFM_GGUF at a local .gguf to skip the download.
 GGUF_LOCAL="${LFM_GGUF:-}"
 # The Windows runner has python.exe but not always python3 under git-bash.
 PY="$(command -v python3 || command -v python)"
@@ -50,8 +50,8 @@ if [ ! -f "$RES/model.gguf" ]; then
   if [ -n "$GGUF_LOCAL" ] && [ -f "$GGUF_LOCAL" ]; then
     cp "$GGUF_LOCAL" "$RES/model.gguf"
   else
-    hf download andreagemelli/LFM2.5-350M-IT-Extract-GGUF LFM2.5-350M-IT-Extract-Q4_K_M.gguf --local-dir "$TMP/gguf"
-    mv "$TMP/gguf/LFM2.5-350M-IT-Extract-Q4_K_M.gguf" "$RES/model.gguf"
+    hf download andreagemelli/LFM2.5-350M-Extract-ML-LoRA-GGUF LFM2.5-350M-Extract-ML-LoRA-Q8_0.gguf --local-dir "$TMP/gguf"
+    mv "$TMP/gguf/LFM2.5-350M-Extract-ML-LoRA-Q8_0.gguf" "$RES/model.gguf"
   fi
 fi
 

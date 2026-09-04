@@ -1,35 +1,22 @@
 import { useState, type KeyboardEvent } from "react";
 import { CaretDown, Check, Plus, Question, Trash, Warning } from "@phosphor-icons/react";
-import schema from "./schema.json";
 import type { Field } from "./types";
-
-const SCHEMA: Record<string, string> = schema;
-
-/**
- * The model was fine-tuned on prompts averaging seven fields, so a new document
- * starts with seven, not all thirty five. More keys means less precision.
- */
-const DEFAULT_KEYS = [
-  "nome",
-  "cognome",
-  "data-nascita",
-  "luogo-nascita",
-  "codice-fiscale",
-  "indirizzo",
-  "comune",
-];
-
-export function defaultFields(): Field[] {
-  return DEFAULT_KEYS.map((key) => ({ key, description: SCHEMA[key] }));
-}
 
 const UNTRAINED = "Questa chiave non era nello schema di fine-tuning: il modello non l'ha mai vista.";
 
+/**
+ * A list of name + description rows. Both things the model is handed have that
+ * shape — the extraction schema and the class list — so this edits either, told
+ * only what the trained vocabulary is.
+ */
 export default function SchemaEditor({
   fields,
+  known,
   onChange,
 }: {
   fields: Field[];
+  /** Trained name → description. Drives the presets and the untrained flag. */
+  known: Record<string, string>;
   onChange: (f: Field[]) => void;
 }) {
   const [focus, setFocus] = useState(-1);
@@ -69,8 +56,8 @@ export default function SchemaEditor({
    */
   function pick(key: string) {
     const i = fields.findIndex((f) => f.key === key);
-    if (i >= 0) set(i, { key, description: SCHEMA[key] });
-    else onChange([...fields, { key, description: SCHEMA[key] }]);
+    if (i >= 0) set(i, { key, description: known[key] });
+    else onChange([...fields, { key, description: known[key] }]);
   }
 
   function applyJson() {
@@ -93,7 +80,7 @@ export default function SchemaEditor({
     }
   }
 
-  const keys = Object.keys(SCHEMA).filter((k) => k.includes(filter.trim().toLowerCase()));
+  const keys = Object.keys(known).filter((k) => k.includes(filter.trim().toLowerCase()));
 
   return (
     <section className="group">
@@ -140,7 +127,7 @@ export default function SchemaEditor({
                   return (
                     <button
                       key={k}
-                      title={SCHEMA[k]}
+                      title={known[k]}
                       // WebKit does not focus a button on click, so letting the
                       // press move focus fires the wrapper's blur handler, closes
                       // the popover and the click never lands. Holding focus on
@@ -231,7 +218,7 @@ export default function SchemaEditor({
                 onChange={(e) => set(i, { ...f, description: e.target.value })}
                 onKeyDown={(e) => onKeyDown(e, i, false)}
               />
-              {f.key.trim() !== "" && !(f.key in SCHEMA) && (
+              {f.key.trim() !== "" && !(f.key in known) && (
                 <span className="flag" title={UNTRAINED}>
                   <Warning size={13} weight="regular" />
                   chiave non addestrata

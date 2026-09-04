@@ -159,11 +159,17 @@ mod tests {
     use super::Sampling;
     use std::path::PathBuf;
 
+    /// The extraction prompt exactly as prompt.ts builds it. Italian keys with
+    /// Italian descriptions, because that is the language of the page below.
     const PROMPT: &str = "<|startoftext|><|im_start|>system\n\
-         Identify and extract information matching the following schema.\n\
-         Return data as a JSON object. Missing data should be omitted.\n\n\
-         name: the person's full name.\n\
-         date: the date on the document.\n\
+         You are an expert document analysis model.\n\
+         Task: information extraction\n\
+         Return a JSON object with exactly the keys listed below, in the same order. \
+         Every value must be copied verbatim from the document. Omit a key whose value \
+         is absent.\n\n\
+         Schema:\n\
+         nome: il nome di battesimo della persona.\n\
+         data: una data.\n\
          <|im_end|>\n\
          <|im_start|>user\n\
          Nome\nMario Rossi\nData\n12/03/2019\n\
@@ -194,7 +200,7 @@ mod tests {
         eprintln!("greedy: {out}");
         assert_eq!(streamed, out, "streamed pieces must rebuild the full text");
         assert!(out.trim_start().starts_with('{'), "expected a JSON object");
-        assert!(out.contains("Mario Rossi"), "expected the name back");
+        assert!(out.contains("Mario"), "expected the name back");
         assert!(!out.contains("<|im_end|>"), "stop token leaked into the output");
 
         let sampled = Sampling {

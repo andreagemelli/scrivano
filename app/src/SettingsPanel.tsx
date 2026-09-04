@@ -60,12 +60,15 @@ function Num({
 
 export default function SettingsPanel({
   fields,
+  known,
   onFields,
   sampling,
   onSampling,
   onClose,
 }: {
   fields: Field[];
+  /** Trained key → description, for the schema editor's presets. */
+  known: Record<string, string>;
   onFields: (f: Field[]) => void;
   sampling: Sampling;
   onSampling: (s: Sampling) => void;
@@ -163,7 +166,9 @@ export default function SettingsPanel({
         </div>
 
         <div className="drawer-body">
-          {tab === "schema" && <SchemaEditor fields={fields} onChange={onFields} />}
+          {tab === "schema" && (
+            <SchemaEditor fields={fields} known={known} onChange={onFields} />
+          )}
 
           {tab === "modello" && (
           <section className="group">

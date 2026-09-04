@@ -1,0 +1,122 @@
+{
+  "application_form": {
+    "en": {
+      "name": "application",
+      "description": "a form filled in to apply or petition for something, such as a benefit, a permit, a job, a grant, or admission"
+    },
+    "it": {
+      "name": "domanda",
+      "description": "un modulo compilato per richiedere un beneficio, un permesso, un contributo o l'ammissione"
+    }
+  },
+  "registration_form": {
+    "en": {
+      "name": "registration",
+      "description": "a form filled in to enrol or register a person, an organization, or an item in a register or service"
+    },
+    "it": {
+      "name": "iscrizione",
+      "description": "un modulo compilato per iscrivere o registrare una persona, un ente o un bene"
+    }
+  },
+  "declaration": {
+    "en": {
+      "name": "declaration",
+      "description": "a statement in which the signer declares facts under their own responsibility"
+    },
+    "it": {
+      "name": "dichiarazione",
+      "description": "una dichiarazione con cui chi firma attesta dei fatti sotto la propria responsabilità"
+    }
+  },
+  "contract": {
+    "en": {
+      "name": "contract",
+      "description": "an agreement between parties setting out mutual obligations, including leases and terms of service"
+    },
+    "it": {
+      "name": "contratto",
+      "description": "un accordo tra le parti che stabilisce obblighi reciproci, compresi locazioni e condizioni di servizio"
+    }
+  },
+  "invoice": {
+    "en": {
+      "name": "invoice",
+      "description": "a bill issued by a supplier listing goods or services supplied and the amount due"
+    },
+    "it": {
+      "name": "fattura",
+      "description": "il documento con cui un fornitore addebita beni o servizi e l'importo dovuto"
+    }
+  },
+  "receipt": {
+    "en": {
+      "name": "receipt",
+      "description": "proof that a payment has been made or that goods have been received"
+    },
+    "it": {
+      "name": "ricevuta",
+      "description": "la prova che un pagamento è stato eseguito o che dei beni sono stati ricevuti"
+    }
+  },
+  "certificate": {
+    "en": {
+      "name": "certificate",
+      "description": "a document issued by an authority attesting a fact, a qualification, or a status"
+    },
+    "it": {
+      "name": "certificato",
+      "description": "un documento rilasciato da un'autorità che attesta un fatto, un titolo o uno stato"
+    }
+  },
+  "curriculum_vitae": {
+    "en": {
+      "name": "resume",
+      "description": "a personal record of education and professional experience"
+    },
+    "it": {
+      "name": "curriculum",
+      "description": "il riepilogo del percorso di studi e dell'esperienza professionale di una persona"
+    }
+  },
+  "questionnaire": {
+    "en": {
+      "name": "questionnaire",
+      "description": "a set of questions put to a respondent to collect opinions or information"
+    },
+    "it": {
+      "name": "questionario",
+      "description": "una serie di domande rivolte a un destinatario per raccogliere opinioni o informazioni"
+    }
+  },
+  "medical_form": {
+    "en": {
+      "name": "medical-form",
+      "description": "a clinical or health-related form, such as a medical history, a prescription, or a consent to treatment"
+    },
+    "it": {
+      "name": "modulo-sanitario",
+      "description": "un modulo clinico o sanitario, come un'anamnesi, una prescrizione o un consenso alle cure"
+    }
+  },
+  "order_form": {
+    "en": {
+      "name": "order",
+      "description": "a form used to order goods or services, listing items and quantities"
+    },
+    "it": {
+      "name": "ordine",
+      "description": "un modulo con cui si ordinano beni o servizi, con articoli e quantità"
+    }
+  },
+  "power_of_attorney": {
+    "en": {
+      "name": "power-of-attorney",
+      "description": "a document by which one person authorises another to act on their behalf"
+    },
+    "it": {
+      "name": "delega",
+      "description": "un atto con cui una persona autorizza un'altra ad agire per suo conto"
+    }
+  }
+}

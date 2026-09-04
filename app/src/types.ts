@@ -1,6 +1,13 @@
 /** Shared shapes. Kept in one file so the Rust bridge, the UI and the store agree. */
 
+/** A schema row, and also a class row: both are a name plus what it means. */
 export type Field = { key: string; description: string };
+
+/** The two things the model was fine-tuned to do. */
+export type Task = "extract" | "classify";
+
+/** UI language, and the language the schema and class names are written in. */
+export type Lang = "en" | "it";
 
 /** Normalised to 0..1 against the rendered page image, so the UI never needs the pixel size. */
 export type Box = { x: number; y: number; w: number; h: number };
@@ -21,6 +28,7 @@ export type Page = {
 export type Status =
   | "empty"
   | "reading"
+  | "classifying"
   | "ready"
   | "extracting"
   | "done"
@@ -42,6 +50,11 @@ export type Doc = {
   sampling?: Sampling;
   /** Decode rate of the last run, tokens per second. Absent if it never ran. */
   tps?: number;
+  /**
+   * The class the model assigned on load, as the localized name it answered
+   * with. Absent when classification is off, unanswerable, or was rejected.
+   */
+  docClass?: string;
 };
 
 /** Decoding knobs sent to llama.cpp with every run. Mirrors `Sampling` in llm.rs. */
