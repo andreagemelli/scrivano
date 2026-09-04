@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowClockwise, Question, X } from "@phosphor-icons/react";
+import { ArrowClockwise, Question, Warning, X } from "@phosphor-icons/react";
 import SchemaEditor from "./SchemaEditor";
+import { defaultClasses } from "./catalog";
+import { DICTS, useT } from "./i18n";
 import { DEFAULT_SAMPLING } from "./types";
-import type { Field, Sampling } from "./types";
+import type { Field, Lang, Sampling } from "./types";
 
 const FOCUSABLE =
   'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+
+/** Endonyms: a language picker that names languages in a language you cannot
+    read is a picker you cannot use. */
+const LANGUAGE_NAME: Record<Lang, string> = { en: "English", it: "Italiano" };
+
+/** True when the list is still exactly the twelve trained names, in order. */
+function sameClasses(classes: Field[], trained: Record<string, string>): boolean {
+  const names = Object.keys(trained);
+  return classes.length === names.length && classes.every((c, i) => c.key === names[i]);
+}
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
@@ -14,6 +26,7 @@ function clamp(n: number, min: number, max: number): number {
 function Num({
   label,
   help,
+  range,
   value,
   min,
   max,
@@ -24,6 +37,8 @@ function Num({
 }: {
   label: string;
   help: string;
+  /** " From 0 to 2." — its own string, since word order is not universal. */
+  range: string;
   value: number;
   min: number;
   max: number;
@@ -52,7 +67,9 @@ function Num({
       />
       {/* Every knob states its bounds: a value that silently snaps teaches nothing. */}
       <span className="setting-help">
-        {help} Da {min} a {max}.{note}
+        {help}
+        {range}
+        {note}
       </span>
     </label>
   );
@@ -64,6 +81,13 @@ export default function SettingsPanel({
   onFields,
   sampling,
   onSampling,
+  lang,
+  onLang,
+  classify,
+  onClassify,
+  classes,
+  trainedClasses,
+  onClasses,
   onClose,
 }: {
   fields: Field[];
@@ -72,16 +96,26 @@ export default function SettingsPanel({
   onFields: (f: Field[]) => void;
   sampling: Sampling;
   onSampling: (s: Sampling) => void;
+  lang: Lang;
+  onLang: (l: Lang) => void;
+  /** Ask for a class as soon as a document opens. Off means never. */
+  classify: boolean;
+  onClassify: (on: boolean) => void;
+  classes: Field[];
+  /** The twelve the model was fine-tuned on, for presets and the flag. */
+  trainedClasses: Record<string, string>;
+  onClasses: (c: Field[]) => void;
   /** The caller closes the panel and puts focus back on the gear button. */
   onClose: () => void;
 }) {
+  const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   // The two halves of this drawer are unrelated: the schema is what you want
   // out, the model is how it decodes. Stacking them buried the model settings
   // under a schema that grows with every field, so they are tabs, not sections.
-  const [tab, setTab] = useState<"schema" | "modello">("schema");
+  const [tab, setTab] = useState<"schema" | "classes" | "model">("schema");
   const greedy = sampling.temperature <= 0;
-  const ignored = greedy ? " Ignorato finché la temperatura è 0." : "";
+  const ignored = greedy ? t.ignoredAtZero : "";
 
   // Focus the close button once, when the panel opens. This is deliberately its
   // own effect with no dependencies: onClose is a fresh closure on every App
@@ -131,16 +165,30 @@ export default function SettingsPanel({
         className="drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="Impostazioni di estrazione"
+        aria-label={t.settingsTitle}
         ref={panel}
       >
         <header className="drawer-head">
-          <h2>Impostazioni di estrazione</h2>
+          <h2>{t.settingsTitle}</h2>
           <span className="grow" />
+          {/* The one setting that is not about a run: it picks the words on
+              screen AND the language the schema and class names are written
+              in, because the model was trained with both in the document's
+              own language. */}
+          <label className="lang">
+            <span className="muted">{t.languageLabel}</span>
+            <select value={lang} onChange={(e) => onLang(e.target.value as Lang)}>
+              {(Object.keys(DICTS) as Lang[]).map((l) => (
+                <option key={l} value={l}>
+                  {LANGUAGE_NAME[l]}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="icon-btn drawer-close"
-            aria-label="Chiudi le impostazioni di estrazione"
-            title="Chiudi"
+            aria-label={t.close}
+            title={t.close}
             onClick={onClose}
           >
             <X size={16} weight="regular" />
@@ -150,54 +198,105 @@ export default function SettingsPanel({
         <div className="drawer-tabs">
           <div className="seg">
             <button aria-pressed={tab === "schema"} onClick={() => setTab("schema")}>
-              Schema
+              {t.schema}
             </button>
-            <button aria-pressed={tab === "modello"} onClick={() => setTab("modello")}>
-              Modello
+            <button aria-pressed={tab === "classes"} onClick={() => setTab("classes")}>
+              {t.classes}
+            </button>
+            <button aria-pressed={tab === "model"} onClick={() => setTab("model")}>
+              {t.model}
             </button>
           </div>
           <span className="muted">
             {tab === "schema"
-              ? `${fields.length} ${fields.length === 1 ? "campo" : "campi"}`
-              : greedy
-                ? "decodifica greedy"
-                : "campionamento attivo"}
+              ? t.fields(fields.length)
+              : tab === "classes"
+                ? classify
+                  ? `${classes.length} · ${t.classifyOnOpen.toLowerCase()}`
+                  : t.classifyOff
+                : greedy
+                  ? t.greedy
+                  : t.sampling}
           </span>
         </div>
 
         <div className="drawer-body">
           {tab === "schema" && (
-            <SchemaEditor fields={fields} known={known} onChange={onFields} />
+            <SchemaEditor fields={fields} known={known} kind="field" onChange={onFields} />
           )}
 
-          {tab === "modello" && (
+          {tab === "classes" && (
+            <section className="group">
+              <div className="group-head">
+                <span className="help" title={t.classifyHelp}>
+                  <Question size={14} weight="regular" />
+                </span>
+                {/* The global off switch. Nothing else on this tab matters when
+                    it is off, but the list stays editable: turning it back on
+                    should not mean rebuilding what you had. */}
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={classify}
+                    onChange={(e) => onClassify(e.target.checked)}
+                  />
+                  {t.classifyOnOpen}
+                </label>
+                <span className="grow" />
+                <button
+                  className="btn"
+                  title={t.restoreClasses}
+                  onClick={() => onClasses(defaultClasses(lang))}
+                >
+                  <ArrowClockwise size={14} weight="regular" />
+                  {t.reset}
+                </button>
+              </div>
+
+              {/* Editing or extending the list is allowed and sometimes right,
+                  but the model was fine-tuned on exactly twelve names. Say so
+                  once here, and per row on the ones it has never seen. */}
+              {!sameClasses(classes, trainedClasses) && (
+                <p className="warn-note">
+                  <Warning size={14} weight="regular" />
+                  {t.classesChanged}
+                </p>
+              )}
+
+              <SchemaEditor
+                fields={classes}
+                known={trainedClasses}
+                kind="class"
+                onChange={onClasses}
+              />
+            </section>
+          )}
+
+          {tab === "model" && (
           <section className="group">
             <div className="group-head">
               <span
                 className="help"
-                title={
-                  greedy
-                    ? "Temperatura 0, quindi l'esecuzione è deterministica: stesso documento e stesso schema danno sempre la stessa risposta."
-                    : "Il campionamento è attivo, quindi due esecuzioni sullo stesso documento possono differire. Il seed rende ripetibile una esecuzione."
-                }
+                title={greedy ? t.greedyHelp : t.samplingHelp}
               >
                 <Question size={14} weight="regular" />
               </span>
               <span className="grow" />
               <button
                 className="btn"
-                title="Ripristina i valori predefiniti del modello"
+                title={t.resetModel}
                 onClick={() => onSampling(DEFAULT_SAMPLING)}
               >
                 <ArrowClockwise size={14} weight="regular" />
-                Ripristina
+                {t.reset}
               </button>
             </div>
 
             <div className="settings">
               <Num
-                label="Temperatura"
-                help="0 significa deterministico. Valori più alti lasciano divagare il modello."
+                label={t.temperature}
+                help={t.temperatureHelp}
+                range={t.range(0, 2)}
                 value={sampling.temperature}
                 min={0}
                 max={2}
@@ -205,8 +304,9 @@ export default function SettingsPanel({
                 onChange={(temperature) => onSampling({ ...sampling, temperature })}
               />
               <Num
-                label="Top-k"
-                help="0 la disattiva. Altrimenti considera solo i k token più probabili."
+                label={t.topK}
+                help={t.topKHelp}
+                range={t.range(0, 200)}
                 note={ignored}
                 off={greedy}
                 value={sampling.topK}
@@ -216,8 +316,9 @@ export default function SettingsPanel({
                 onChange={(topK) => onSampling({ ...sampling, topK })}
               />
               <Num
-                label="Top-p"
-                help="1 lo disattiva. Altrimenti taglia i token meno probabili."
+                label={t.topP}
+                help={t.topPHelp}
+                range={t.range(0, 1)}
                 note={ignored}
                 off={greedy}
                 value={sampling.topP}
@@ -227,8 +328,9 @@ export default function SettingsPanel({
                 onChange={(topP) => onSampling({ ...sampling, topP })}
               />
               <Num
-                label="Token massimi"
-                help="La risposta più lunga che il modello può scrivere."
+                label={t.maxTokens}
+                help={t.maxTokensHelp}
+                range={t.range(16, 4096)}
                 value={sampling.maxTokens}
                 min={16}
                 max={4096}
@@ -236,8 +338,9 @@ export default function SettingsPanel({
                 onChange={(maxTokens) => onSampling({ ...sampling, maxTokens })}
               />
               <Num
-                label="Seed"
-                help="Fissa l'estrazione casuale, così una esecuzione campionata è ripetibile."
+                label={t.seed}
+                help={t.seedHelp}
+                range={t.range(0, 4294967295)}
                 note={ignored}
                 off={greedy}
                 value={sampling.seed}

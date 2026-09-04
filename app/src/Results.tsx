@@ -4,18 +4,13 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { isGrounded } from "./prompt";
+import { useT } from "./i18n";
 import type { Doc, Field } from "./types";
 
-const NOT_ON_PAGE =
-  "Questo testo non compare da nessuna parte nel documento, quindi il modello lo ha probabilmente inventato.";
-
-const SPEED_HELP =
-  "Velocità di generazione del modello, token al secondo. Misurata dal primo token, quindi non include la lettura del prompt.";
-
 /** Rate readout. Two significant figures is all the precision this number has. */
-function Speed({ tps, live }: { tps: number; live: boolean }) {
+function Speed({ tps, live, help }: { tps: number; live: boolean; help: string }) {
   return (
-    <span className={live ? "speed live" : "speed"} title={SPEED_HELP}>
+    <span className={live ? "speed live" : "speed"} title={help}>
       <Gauge size={13} weight="regular" />
       {tps.toFixed(tps < 10 ? 1 : 0)} tok/s
     </span>
@@ -43,6 +38,7 @@ export default function Results({
   /** Opens the settings drawer on the schema. */
   onSettings: () => void;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   // JSON is the default because the JSON is the deliverable. Fields is there
@@ -91,46 +87,46 @@ export default function Results({
   return (
     <section className="panel json-pane">
       <header className="panel-head">
-        <h2>Estrazione</h2>
+        <h2>{t.extraction}</h2>
         {/* The schema is what this panel is going to contain, so it is on screen
             before a run and it is the way in to editing it. */}
         <button
           className="link-btn"
-          title="Apri lo schema nelle impostazioni di estrazione"
+          title={t.openSchema}
           onClick={onSettings}
         >
-          Schema &middot; {fields.length} {fields.length === 1 ? "campo" : "campi"}
+          {t.schemaCount(fields.length)}
         </button>
         <span className="grow" />
-        {tps !== null && <Speed tps={tps} live={extracting} />}
+        {tps !== null && <Speed tps={tps} live={extracting} help={t.speedHelp} />}
         {!extracting && result && (
           <>
             <span
               className="help"
-              title="I valori sono modificabili. Passa il puntatore su uno per trovarlo nel testo del documento."
+              title={t.valuesEditable}
             >
               <Question size={13} weight="regular" />
             </span>
             <div className="seg">
               <button aria-pressed={view === "fields"} onClick={() => setView("fields")}>
-                Campi
+                {t.fieldsView}
               </button>
               <button aria-pressed={view === "json"} onClick={() => setView("json")}>
-                JSON
+                {t.jsonView}
               </button>
             </div>
           </>
         )}
         {text !== "" && (
           <>
-            {copied && <span className="muted">Copiato</span>}
-            <button className="icon-btn" aria-label="Copia il JSON" title="Copia il JSON" onClick={copy}>
+            {copied && <span className="muted">{t.copied}</span>}
+            <button className="icon-btn" aria-label={t.copyJson} title={t.copyJson} onClick={copy}>
               <Copy size={16} weight="regular" />
             </button>
             <button
               className="icon-btn"
-              aria-label="Scarica il JSON"
-              title="Scarica il JSON"
+              aria-label={t.downloadJson}
+              title={t.downloadJson}
               onClick={download}
             >
               <DownloadSimple size={16} weight="regular" />
@@ -141,11 +137,11 @@ export default function Results({
 
       <div className="panel-body">
         {doc && doc.status === "failed" && doc.pages.length > 0 && (
-          <p className="err">Estrazione fallita: {doc.error}</p>
+          <p className="err">{t.extractFailed(doc.error ?? "")}</p>
         )}
 
         {doc && doc.raw !== undefined && !result && (
-          <p className="err">Il modello non ha restituito un JSON valido. Qui sotto l'output grezzo.</p>
+          <p className="err">{t.notJson}</p>
         )}
 
         {/* Nothing is drawn before a run: an empty object asserts an extraction
@@ -153,9 +149,7 @@ export default function Results({
         {!extracting && text === "" && (
           <>
             <p className="hint">
-              {doc
-                ? "Premi Estrai per riempire lo schema con i dati di questo documento."
-                : "Aggiungi un documento, poi premi Estrai."}
+              {doc ? t.pressExtract : t.addThenExtract}
             </p>
             {/* A preview of the shape the run will return, so the panel is never
                 a blank surface and the schema is legible without the drawer. */}
@@ -176,7 +170,7 @@ export default function Results({
 
         {extracting && (
           <>
-            <p className="hint">Il modello sta leggendo il documento.</p>
+            <p className="hint">{t.modelReading}</p>
             <pre className="raw">
               {stream}
               <span className="caret" />
@@ -199,16 +193,16 @@ export default function Results({
                     <span className="flabel">{key}</span>
                     <input
                       className="jval fvalue"
-                      aria-label={`Valore di ${key}`}
+                      aria-label={t.valueOf(key)}
                       value={value}
                       onChange={(e) => edit(key, e.target.value)}
                       onFocus={() => onHover(value)}
                       onBlur={() => onHover(null)}
                     />
                     {!isGrounded(value, lines) && (
-                      <span className="flag" title={NOT_ON_PAGE}>
+                      <span className="flag" title={t.notOnPageHelp}>
                         <Warning size={13} weight="regular" />
-                        non nel documento
+                        {t.notOnPage}
                       </span>
                     )}
                   </div>
@@ -222,13 +216,9 @@ export default function Results({
               <section className="nofound">
                 <h3>
                   <Warning size={14} weight="regular" />
-                  {missing.length} {missing.length === 1 ? "campo senza valore" : "campi senza valore"}
+                  {t.emptyFields(missing.length)}
                 </h3>
-                <p>
-                  Il modello non ha restituito nulla per{" "}
-                  {missing.length === 1 ? "questa chiave" : "queste chiavi"}, quindi{" "}
-                  {missing.length === 1 ? "è assente" : "sono assenti"} dal JSON.
-                </p>
+                <p>{t.emptyFieldsHelp(missing.length)}</p>
                 <ul>
                   {missing.map((key) => (
                     <li key={key}>{key}</li>
@@ -258,7 +248,7 @@ export default function Results({
                     <span className="jquote">"</span>
                     <input
                       className="jval"
-                      aria-label={`Valore di ${key}`}
+                      aria-label={t.valueOf(key)}
                       value={value}
                       // A mono input sized to its text plus its own padding and
                       // border, so the JSON keeps its shape and nothing is clipped.
@@ -271,9 +261,9 @@ export default function Results({
                         strands a comma on a line of its own. */}
                     <span className="jquote">"{i < keys.length - 1 ? "," : ""}</span>
                     {!grounded && (
-                      <span className="flag" title={NOT_ON_PAGE}>
+                      <span className="flag" title={t.notOnPageHelp}>
                         <Warning size={13} weight="regular" />
-                        non nel documento
+                        {t.notOnPage}
                       </span>
                     )}
                   </div>

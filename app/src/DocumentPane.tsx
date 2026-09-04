@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FilePlus } from "@phosphor-icons/react";
+import { useT } from "./i18n";
 import type { Doc } from "./types";
 
 /**
@@ -52,6 +53,7 @@ export default function DocumentPane({
   highlight: string | null;
   onAdd: () => void;
 }) {
+  const t = useT();
   const [tab, setTab] = useState<"page" | "text">("page");
   const first = useRef<HTMLElement | null>(null);
   const hasResult = doc?.result !== undefined;
@@ -87,21 +89,20 @@ export default function DocumentPane({
   return (
     <section className={dragging ? "panel doc-pane dragging" : "panel doc-pane"}>
       <header className="panel-head">
-        <h2>Documento</h2>
+        <h2>{t.document}</h2>
         {pageCount > 0 && (
           <span className="muted">
-            {pageCount} {pageCount === 1 ? "pagina" : "pagine"}, {lineCount}{" "}
-            {lineCount === 1 ? "riga" : "righe"}
+            {t.pages(pageCount)}, {t.lines(lineCount)}
           </span>
         )}
         <span className="grow" />
         {pageCount > 0 && (
           <div className="seg">
             <button aria-pressed={tab === "page"} onClick={() => setTab("page")}>
-              Pagina
+              {t.pageTab}
             </button>
             <button aria-pressed={tab === "text"} onClick={() => setTab("text")}>
-              Testo
+              {t.textTab}
             </button>
           </div>
         )}
@@ -115,19 +116,19 @@ export default function DocumentPane({
           <div className="drop-zone">
             <FilePlus size={34} weight="light" />
             <p className="lead">
-              {dragging ? "Rilascia per aprire questo file" : "Trascina qui un documento per leggerne il testo"}
+              {dragging ? t.dropToOpen : t.dropHere}
             </p>
             <button className="btn primary" onClick={onAdd}>
-              Scegli un file
+              {t.chooseFile}
             </button>
-            <p className="note">PDF, PNG, JPEG, WebP o TIFF</p>
+            <p className="note">{t.formats}</p>
             {dropError !== "" && <p className="note err-text">{dropError}</p>}
           </div>
         )}
 
         {doc?.status === "reading" && (
           <div className="skel">
-            <p className="hint">{progress || "Lettura del file"}</p>
+            <p className="hint">{progress || t.readingFile}</p>
             <div className="skel-page" />
             <div className="skel-line" style={{ width: "70%" }} />
             <div className="skel-line" style={{ width: "45%" }} />
@@ -135,19 +136,19 @@ export default function DocumentPane({
         )}
 
         {doc && doc.pages.length === 0 && doc.status === "failed" && (
-          <p className="err">Impossibile leggere questo documento: {doc.error}</p>
+          <p className="err">{t.readFailed(doc.error ?? "")}</p>
         )}
 
         {doc && pageCount > 0 && tab === "page" && (
           <div className="pages">
             {doc.pages.map((p, i) => (
               <div className="page" key={i}>
-                <div className="page-num">Pagina {i + 1}</div>
+                <div className="page-num">{t.page(i + 1)}</div>
                 {/* Percentages off the normalised box, so the overlay follows the
                     image at any render width and needs no resize listener. A line
                     without a box is not drawn: a guessed rect points at nothing. */}
                 <div className="shot">
-                  <img className="page-img" src={p.image} alt={`Pagina ${i + 1}`} />
+                  <img className="page-img" src={p.image} alt={t.page(i + 1)} />
                   <div className="marks" aria-hidden="true">
                     {p.lines.map((l, n) =>
                       l.box && hits(l.text, needle) ? (
@@ -176,10 +177,10 @@ export default function DocumentPane({
             {doc.pages.map((p, i) => (
               <div className="text-block" key={i}>
                 <div className="page-num">
-                  Pagina {i + 1}
-                  <span className="tag">{p.fromTextLayer ? "testo del PDF" : "OCR"}</span>
+                  {t.page(i + 1)}
+                  <span className="tag">{p.fromTextLayer ? t.fromTextLayer : t.fromOcr}</span>
                 </div>
-                {p.lines.length === 0 && <div className="hint">Nessun testo trovato in questa pagina.</div>}
+                {p.lines.length === 0 && <div className="hint">{t.emptyPage}</div>}
                 {p.lines.map((l, n) => (
                   <div className="line" key={n}>
                     <span className="ln">{n + 1}</span>

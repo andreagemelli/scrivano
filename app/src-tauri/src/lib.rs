@@ -37,13 +37,13 @@ fn backend_status(app: AppHandle) -> BackendStatus {
     if missing.is_empty() {
         BackendStatus {
             ok: true,
-            detail: format!("modelli in {}", res(&app, "model.gguf").display()),
+            detail: format!("models in {}", res(&app, "model.gguf").display()),
         }
     } else {
         BackendStatus {
             ok: false,
             detail: format!(
-                "Risorse mancanti: {}. Esegui scripts/fetch-resources.sh",
+                "Missing resources: {}. Run scripts/fetch-resources.sh",
                 missing.join(", ")
             ),
         }

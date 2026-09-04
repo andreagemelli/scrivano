@@ -4,43 +4,28 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { backendStatus, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
-import { loadDocs, saveDocs } from "./store";
-import { buildPrompt, parseAnswer } from "./prompt";
-import { defaultFields, schemaFor } from "./catalog";
+import { DEFAULT_PREFS, loadDocs, loadPrefs, saveDocs, savePrefs } from "./store";
+import { buildPrompt, parseAnswer, parseClass } from "./prompt";
+import { classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
+import { DICTS, Words } from "./i18n";
 import Logo from "./Logo";
 import Sidebar from "./Sidebar";
 import DocumentPane from "./DocumentPane";
 import SettingsPanel from "./SettingsPanel";
 import Results from "./Results";
-import { DEFAULT_SAMPLING } from "./types";
-import type { Doc, Field, Lang, Sampling, Status } from "./types";
+import { CLASSIFY_SAMPLING, DEFAULT_SAMPLING } from "./types";
+import type { Dict } from "./i18n";
+import type { Doc, Field, Lang, Page, Sampling, Status } from "./types";
 
-// The language the schema and the class names are written in. The model wants
-// them in the document's own language; the switch that makes this a setting
-// lands with the interface translation.
-const LANG: Lang = "it";
+/** Classification streams into nothing: one short object, no live view of it. */
+const noop = () => {};
 
 const EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp", "tif", "tiff"];
-
-const BACKEND_DOWN = "Il modello di estrazione non risponde. Riavvia Scrivano e riprova.";
-
-const NO_TAURI =
-  "Questo è il server di sviluppo del browser: apertura dei file, OCR e modello non sono disponibili. Avvia invece npm run tauri dev.";
 
 /** Same array identity on every render, so the store effect can tell "not touched yet". */
 const INITIAL: Doc[] = [];
 
-const STATUS_LABEL: Record<Status, string> = {
-  empty: "Nessun documento",
-  reading: "Lettura",
-  classifying: "Classificazione",
-  ready: "Pronto",
-  extracting: "Estrazione",
-  done: "Completato",
-  failed: "Errore",
-};
-
-/** Every state gets a dot; only the two working ones pulse. */
+/** Every state gets a dot; only the working ones pulse. */
 function dotClass(s: Status): string {
   if (s === "reading" || s === "extracting" || s === "classifying") return "dot busy";
   if (s === "failed") return "dot failed";
@@ -57,21 +42,21 @@ function message(e: unknown): string {
 
 /** Empty string means the Extract button is live. */
 function blocker(
+  t: Dict,
   doc: Doc | null,
   fields: Field[],
   backend: { ok: boolean; detail: string } | null,
 ): string {
-  if (!doc) return "Aggiungi prima un documento";
-  if (doc.status === "reading") return "Lettura del documento in corso";
-  if (doc.status === "classifying") return "Classificazione in corso";
-  if (doc.status === "extracting") return "Estrazione già in corso";
-  if (doc.pages.every((p) => p.lines.length === 0))
-    return "Nessun testo trovato in questo documento";
-  if (fields.length === 0) return "Aggiungi almeno un campo";
-  if (fields.some((f) => f.key.trim() === "")) return "Ogni campo deve avere una chiave";
+  if (!doc) return t.needDocument;
+  if (doc.status === "reading") return t.stillReading;
+  if (doc.status === "classifying") return t.stillClassifying;
+  if (doc.status === "extracting") return t.alreadyExtracting;
+  if (doc.pages.every((p) => p.lines.length === 0)) return t.noText;
+  if (fields.length === 0) return t.needField;
+  if (fields.some((f) => f.key.trim() === "")) return t.needKey;
   // The banner already carries the detail; the button just says it cannot run.
-  if (!inTauri) return "Non disponibile nel server di sviluppo del browser";
-  if (backend && !backend.ok) return "Il modello di estrazione non è disponibile";
+  if (!inTauri) return t.noDevServer;
+  if (backend && !backend.ok) return t.noModel;
   return "";
 }
 
@@ -93,10 +78,13 @@ export default function App() {
   // keeps its rate on the document instead, so history still reports it.
   const [speed, setSpeed] = useState<number | null>(null);
   const [backend, setBackend] = useState<{ ok: boolean; detail: string } | null>(null);
+  const [lang, setLang] = useState<Lang>(DEFAULT_PREFS.lang);
+  const [classify, setClassify] = useState(DEFAULT_PREFS.classify);
+  const [classes, setClasses] = useState<Field[]>(DEFAULT_PREFS.classes);
   // The schema belongs to what you want, not to a file, so it exists before any
   // document does and a new document inherits whatever is on screen. Sampling
   // works the same way.
-  const [draft, setDraft] = useState<Field[]>(() => defaultFields(LANG));
+  const [draft, setDraft] = useState<Field[]>(() => defaultFields(DEFAULT_PREFS.lang));
   const [draftSampling, setDraftSampling] = useState<Sampling>(DEFAULT_SAMPLING);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState("");
@@ -108,6 +96,7 @@ export default function App() {
   const disk = useRef<Doc[]>(INITIAL);
   const gearRef = useRef<HTMLButtonElement>(null);
 
+  const t = DICTS[lang];
   const doc = docs.find((d) => d.id === activeId) ?? null;
   const fields = doc ? doc.fields : draft;
   const sampling = doc ? (doc.sampling ?? DEFAULT_SAMPLING) : draftSampling;
@@ -115,6 +104,14 @@ export default function App() {
   // The drag listener is registered once, so it reads the live values here.
   const newDocDefaults = useRef({ fields, sampling });
   newDocDefaults.current = { fields, sampling };
+  // addPath runs from a listener registered once, so the classification
+  // settings have to be read at call time, not captured at mount.
+  const classifier = useRef({ classify, classes });
+  classifier.current = { classify, classes };
+  // Same reason: the drop handler needs the current words, not the ones that
+  // were on screen when it was registered.
+  const words = useRef(t);
+  words.current = t;
 
   useEffect(() => {
     loadDocs().then((d) => {
@@ -126,16 +123,37 @@ export default function App() {
       setDocs((cur) => (cur === INITIAL ? d : [...cur, ...d]));
       setActiveId((cur) => cur ?? d[0]?.id ?? null);
     });
+    loadPrefs().then((p) => {
+      setLang(p.lang);
+      setClassify(p.classify);
+      setClasses(p.classes);
+      // The draft schema is the English preset and nobody has touched it yet,
+      // so it becomes the stored language's preset rather than staying a mix.
+      if (p.lang !== DEFAULT_PREFS.lang) {
+        setDraft((cur) =>
+          sameKeys(cur, defaultFields(DEFAULT_PREFS.lang)) ? defaultFields(p.lang) : cur,
+        );
+      }
+    });
+    // Empty detail means "one of ours": the words are chosen at render time,
+    // since this resolves before the stored language does. A detail with text
+    // in it came from Rust and names a missing file.
     if (!inTauri) {
-      setBackend({ ok: false, detail: NO_TAURI });
+      setBackend({ ok: false, detail: "" });
       return;
     }
     backendStatus().then(setBackend, (e) => {
       // The raw exception names an internal API and helps nobody on screen.
       console.error("backend_status failed", e);
-      setBackend({ ok: false, detail: BACKEND_DOWN });
+      setBackend({ ok: false, detail: "" });
     });
   }, []);
+
+  // Hyphenation and screen readers both read this, and it is wrong the moment
+  // the language changes without it.
+  useEffect(() => {
+    document.documentElement.lang = t.htmlLang;
+  }, [t]);
 
   // Pages carry base64 images, so a store write is megabytes. Debounce it, and
   // skip the copy that just came off disk. Streaming tokens live in `stream`,
@@ -145,6 +163,28 @@ export default function App() {
     const t = setTimeout(() => void saveDocs(docs), 400);
     return () => clearTimeout(t);
   }, [docs]);
+
+  function changeLanguage(next: Lang) {
+    // An untouched list follows the language, an edited one does not: the
+    // second is work someone did, and silently replacing it loses it.
+    const nextClasses = sameKeys(classes, defaultClasses(lang))
+      ? defaultClasses(next)
+      : classes;
+    setLang(next);
+    setClasses(nextClasses);
+    void savePrefs({ lang: next, classify, classes: nextClasses });
+    if (sameKeys(fields, defaultFields(lang))) setFields(defaultFields(next));
+  }
+
+  function changeClassify(next: boolean) {
+    setClassify(next);
+    void savePrefs({ lang, classify: next, classes });
+  }
+
+  function changeClasses(next: Field[]) {
+    setClasses(next);
+    void savePrefs({ lang, classify, classes: next });
+  }
 
   function toggleRail() {
     setRailOpen((open) => {
@@ -180,14 +220,41 @@ export default function App() {
       ...ds,
     ]);
     setActiveId(id);
-    setProgress("Lettura del file");
+    setProgress(words.current.readingFile);
+    let pages;
     try {
-      const pages = await loadPages(path, setProgress);
-      patch(id, { pages, status: "ready" });
+      pages = await loadPages(path, setProgress, words.current);
     } catch (e) {
       patch(id, { status: "failed", error: message(e) });
+      return;
     } finally {
       setProgress("");
+    }
+    await classifyDoc(id, pages);
+  }
+
+  /**
+   * Ask the model what kind of document this is, once, on open.
+   *
+   * Unlike extraction there is nothing to set up first — the class list is the
+   * same for every document — so waiting for a button press buys nothing. A
+   * failure here is not the document's failure: it still opens, and it still
+   * extracts. It just opens without a class.
+   */
+  async function classifyDoc(id: string, pages: Page[]) {
+    const { classify, classes } = classifier.current;
+    const lines = pages.flatMap((p) => p.lines.map((l) => l.text));
+    if (!classify || classes.length === 0 || lines.length === 0 || !inTauri) {
+      patch(id, { pages, status: "ready" });
+      return;
+    }
+    patch(id, { pages, status: "classifying" });
+    try {
+      const raw = await extract(buildPrompt("classify", classes, lines), CLASSIFY_SAMPLING, noop);
+      patch(id, { status: "ready", docClass: parseClass(raw, classes) ?? undefined });
+    } catch (e) {
+      console.error("classification failed", e);
+      patch(id, { status: "ready" });
     }
   }
 
@@ -207,7 +274,7 @@ export default function App() {
           setDragging(false);
           if (e.payload.type !== "drop") return;
           const path = e.payload.paths.find(accepted);
-          setDropError(path ? "" : `File non supportato. Usa ${EXTENSIONS.join(", ")}.`);
+          setDropError(path ? "" : words.current.unsupported(EXTENSIONS));
           if (path) void addPath(path);
         })
         .then((un) => {
@@ -228,7 +295,7 @@ export default function App() {
     try {
       const path = await open({
         multiple: false,
-        filters: [{ name: "Documenti", extensions: EXTENSIONS }],
+        filters: [{ name: t.documentsFilter, extensions: EXTENSIONS }],
       });
       if (typeof path === "string") {
         setDropError("");
@@ -236,9 +303,7 @@ export default function App() {
       }
     } catch (e) {
       console.error("file dialog failed", e);
-      setDropError(
-        inTauri ? `Impossibile aprire la finestra di selezione. ${message(e)}` : NO_TAURI,
-      );
+      setDropError(inTauri ? t.pickerFailed(message(e)) : t.noTauri);
     }
   }
 
@@ -279,8 +344,8 @@ export default function App() {
     let tps: number | undefined;
     try {
       let acc = "";
-      const raw = await extract(buildPrompt("extract", doc.fields, lines), sampling, (t) => {
-        acc += t;
+      const raw = await extract(buildPrompt("extract", doc.fields, lines), sampling, (piece) => {
+        acc += piece;
         setStream(acc);
         if (n === 0) started = performance.now();
         n++;
@@ -301,120 +366,140 @@ export default function App() {
   }
 
   const status: Status = doc?.status ?? "empty";
-  const reason = blocker(doc, fields, backend);
+  const reason = blocker(t, doc, fields, backend);
   const modelDown = !inTauri || (backend !== null && !backend.ok);
-  const statusText = status === "ready" && modelDown ? "Modello non disponibile" : STATUS_LABEL[status];
+  const statusText = status === "ready" && modelDown ? t.modelUnavailable : t.statusLabel[status];
 
   return (
-    <div className="app">
-      <header className="topbar" data-tauri-drag-region>
-        <span className="brand">
-          <Logo size={19} />
-          Scrivano
-          {/* One fine-tune on 149 documents. Say so where it cannot be missed. */}
-          <span className="beta" title="Versione beta: il modello è ancora in evoluzione.">
-            beta
+    <Words.Provider value={t}>
+      <div className="app">
+        <header className="topbar" data-tauri-drag-region>
+          <span className="brand">
+            <Logo size={19} />
+            Scrivano
+            {/* A 350M model on eight languages. Say so where it cannot be missed. */}
+            <span className="beta" title={t.betaTitle}>
+              beta
+            </span>
           </span>
-        </span>
-        {doc && (
-          <span className="topbar-doc" title={doc.name}>
-            {doc.name}
+          {doc && (
+            <span className="topbar-doc" title={doc.name}>
+              {doc.name}
+            </span>
+          )}
+          {/* The class travels with the document name, so it is on screen with
+              the rail collapsed too. Nothing is drawn before an answer: an
+              empty tag would read as a class the model chose. */}
+          {doc?.docClass !== undefined && <span className="tag">{doc.docClass}</span>}
+          <span className={`pill status-${status}`}>
+            <i className={dotClass(status)} />
+            {/* "Ready" next to a button saying the model cannot run is a lie, and
+                the chip is the louder of the two. Say the thing that blocks. */}
+            {statusText}
           </span>
-        )}
-        <span className={`pill status-${status}`}>
-          <i className={dotClass(status)} />
-          {/* "Pronto" next to a button saying the model cannot run is a lie, and
-              the chip is the louder of the two. Say the thing that blocks. */}
-          {statusText}
-        </span>
-        <span className="grow" />
-        {reason !== "" && (
-          <span className="reason" title={reason}>
-            {reason}
-          </span>
-        )}
-        <button
-          className="btn primary"
-          disabled={reason !== ""}
-          title={reason === "" ? "Avvia l'estrazione" : reason}
-          onClick={runExtract}
-        >
-          <Play size={14} weight="fill" />
-          {status === "extracting" ? "Estrazione…" : "Estrai"}
-        </button>
-        <button
-          ref={gearRef}
-          className="btn"
-          aria-expanded={settings}
-          title="Impostazioni di estrazione"
-          onClick={() => setSettings(true)}
-        >
-          <Gear size={16} weight="regular" />
-          Impostazioni
-        </button>
-      </header>
-
-      {backend && !backend.ok && !hushed && (
-        <div className="banner" role="alert">
-          <WarningCircle size={16} weight="regular" />
-          <span className="grow">{backend.detail}</span>
+          <span className="grow" />
+          {reason !== "" && (
+            <span className="reason" title={reason}>
+              {reason}
+            </span>
+          )}
           <button
-            className="icon-btn"
-            aria-label="Chiudi l'avviso"
-            title="Chiudi"
-            onClick={() => setHushed(true)}
+            className="btn primary"
+            disabled={reason !== ""}
+            title={reason === "" ? t.runExtraction : reason}
+            onClick={runExtract}
           >
-            <X size={14} weight="regular" />
+            <Play size={14} weight="fill" />
+            {status === "extracting" ? t.extracting : t.extract}
           </button>
-        </div>
-      )}
+          <button
+            ref={gearRef}
+            className="btn"
+            aria-expanded={settings}
+            title={t.settingsTitle}
+            onClick={() => setSettings(true)}
+          >
+            <Gear size={16} weight="regular" />
+            {t.settings}
+          </button>
+        </header>
 
-      <div className="workspace">
-        <Sidebar
-          docs={docs}
-          activeId={activeId}
-          open={railOpen}
-          onToggle={toggleRail}
-          onSelect={setActiveId}
-          onAdd={pickDocument}
-          onDelete={removeDocument}
-        />
-
-        <main className="stage">
-          <DocumentPane
-            doc={doc}
-            progress={progress}
-            dragging={dragging}
-            dropError={dropError}
-            highlight={highlight}
-            onAdd={pickDocument}
-          />
-          {/* Source on the left, output on the right. */}
-          <div className="flow" aria-hidden="true">
-            <ArrowRight size={18} weight="bold" />
+        {backend && !backend.ok && !hushed && (
+          <div className="banner" role="alert">
+            <WarningCircle size={16} weight="regular" />
+            <span className="grow">
+              {backend.detail || (inTauri ? t.backendDown : t.noTauri)}
+            </span>
+            <button
+              className="icon-btn"
+              aria-label={t.dismissWarning}
+              title={t.close}
+              onClick={() => setHushed(true)}
+            >
+              <X size={14} weight="regular" />
+            </button>
           </div>
-          <Results
-            doc={doc}
-            fields={fields}
-            stream={stream}
-            speed={speed}
-            onEdit={(result) => doc && patch(doc.id, { result })}
-            onHover={setHighlight}
-            onSettings={() => setSettings(true)}
-          />
-        </main>
-      </div>
+        )}
 
-      {settings && (
-        <SettingsPanel
-          fields={fields}
-          known={schemaFor(LANG)}
-          onFields={setFields}
-          sampling={sampling}
-          onSampling={setSampling}
-          onClose={closeSettings}
-        />
-      )}
-    </div>
+        <div className="workspace">
+          <Sidebar
+            docs={docs}
+            activeId={activeId}
+            open={railOpen}
+            onToggle={toggleRail}
+            onSelect={setActiveId}
+            onAdd={pickDocument}
+            onDelete={removeDocument}
+          />
+
+          <main className="stage">
+            <DocumentPane
+              doc={doc}
+              progress={progress}
+              dragging={dragging}
+              dropError={dropError}
+              highlight={highlight}
+              onAdd={pickDocument}
+            />
+            {/* Source on the left, output on the right. */}
+            <div className="flow" aria-hidden="true">
+              <ArrowRight size={18} weight="bold" />
+            </div>
+            <Results
+              doc={doc}
+              fields={fields}
+              stream={stream}
+              speed={speed}
+              onEdit={(result) => doc && patch(doc.id, { result })}
+              onHover={setHighlight}
+              onSettings={() => setSettings(true)}
+            />
+          </main>
+        </div>
+
+        {settings && (
+          <SettingsPanel
+            fields={fields}
+            known={schemaFor(lang)}
+            onFields={setFields}
+            sampling={sampling}
+            onSampling={setSampling}
+            lang={lang}
+            onLang={changeLanguage}
+            classify={classify}
+            onClassify={changeClassify}
+            classes={classes}
+            trainedClasses={classesFor(lang)}
+            onClasses={changeClasses}
+            onClose={closeSettings}
+          />
+        )}
+      </div>
+    </Words.Provider>
   );
+}
+
+/** Two schemas naming the same keys in the same order: nobody has edited this one. */
+function sameKeys(a: Field[], b: Field[]): boolean {
+  return a.length === b.length && a.every((f, i) => f.key === b[i].key);
 }

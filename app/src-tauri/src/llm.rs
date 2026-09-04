@@ -95,7 +95,7 @@ pub fn run(
     let max_new_tokens = sampling.max_new_tokens();
     let mut slot = MODEL
         .lock()
-        .map_err(|e| anyhow!("lock del modello corrotto: {e}"))?;
+        .map_err(|e| anyhow!("the model lock is poisoned: {e}"))?;
     if slot.is_none() {
         *slot = Some(load(gguf)?);
     }
@@ -108,7 +108,7 @@ pub fn run(
     let n_ctx_train = model.n_ctx_train();
     if n_ctx > n_ctx_train {
         return Err(anyhow!(
-            "documento troppo lungo: {} token di prompt, il contesto del modello è {}",
+            "document too long: {} prompt tokens, the model's context is {}",
             tokens.len(),
             n_ctx_train
         ));
@@ -215,6 +215,50 @@ mod tests {
         eprintln!("sampled: {out}");
         assert!(!out.trim().is_empty(), "sampled decode returned nothing");
         assert_eq!(streamed, out, "streamed pieces must rebuild the full text");
+        assert!(!out.contains("<|im_end|>"), "stop token leaked into the output");
+
+        super::unload();
+    }
+
+    /// The classification prompt, same page, three of the twelve classes. Its
+    /// own test because the two tasks share a decode path and nothing else: a
+    /// header that drifts from make_docai.py shows up here and nowhere else.
+    #[test]
+    fn classifies() {
+        let gguf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("model.gguf");
+        if !gguf.exists() {
+            eprintln!("skipping: run scripts/fetch-resources.sh first");
+            return;
+        }
+
+        const PROMPT: &str = "<|startoftext|><|im_start|>system\n\
+             You are an expert document analysis model.\n\
+             Task: document classification\n\
+             Assign the document to exactly one of the classes listed below. \
+             Answer with a JSON object of the form {\"class\": \"<class>\"}.\n\n\
+             Classes:\n\
+             fattura: una richiesta di pagamento per beni o servizi.\n\
+             delega: un atto con cui una persona incarica un'altra di agire per suo conto.\n\
+             curriculum: un documento che riassume studi ed esperienze lavorative di una persona.\n\
+             <|im_end|>\n\
+             <|im_start|>user\n\
+             FATTURA N. 42\nData 12/03/2019\nImponibile 100,00\nIVA 22%\nTotale 122,00\n\
+             <|im_end|>\n\
+             <|im_start|>assistant\n";
+
+        let greedy = Sampling {
+            temperature: 0.0,
+            top_k: 0,
+            top_p: 1.0,
+            max_tokens: 64,
+            seed: 42,
+        };
+        let out = super::run(&gguf, PROMPT, &greedy, |_| {}).expect("generation");
+        eprintln!("class: {out}");
+        assert!(out.contains("\"class\""), "expected a {{\"class\": ...}} object");
+        assert!(out.contains("fattura"), "expected the invoice class back");
         assert!(!out.contains("<|im_end|>"), "stop token leaked into the output");
 
         super::unload();

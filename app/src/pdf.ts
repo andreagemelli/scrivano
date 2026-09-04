@@ -1,6 +1,7 @@
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import { ocr } from "./api";
+import type { Dict } from "./i18n";
 import type { Box, Line, Page } from "./types";
 
 // Served by vite-plugin-static-copy with the upsert polyfill prepended.
@@ -31,9 +32,9 @@ function dataUrl(bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<string> 
   });
 }
 
-async function pngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+async function pngBytes(canvas: HTMLCanvasElement, t: Dict): Promise<Uint8Array> {
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
-  if (!blob) throw new Error("impossibile codificare la pagina renderizzata");
+  if (!blob) throw new Error(t.encodeFailed);
   return new Uint8Array(await blob.arrayBuffer());
 }
 
@@ -151,14 +152,15 @@ function itemBox(
 export async function loadPages(
   path: string,
   onProgress: (msg: string) => void,
+  t: Dict,
 ): Promise<Page[]> {
   const bytes = await readFile(path);
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
 
   if (ext !== "pdf") {
-    onProgress("Lettura dell'immagine");
+    onProgress(t.readingImage);
     const image = await dataUrl(bytes, MIME[ext] ?? "image/png");
-    onProgress("OCR in corso");
+    onProgress(t.runningOcr);
     // The Rust side sniffs the format, so jpeg and tiff go over as-is.
     return [{ image, lines: await ocr(bytes), fromTextLayer: false }];
   }
@@ -175,7 +177,7 @@ export async function loadPages(
   const canvas = document.createElement("canvas");
   const pages: Page[] = [];
   for (let n = 1; n <= pdf.numPages; n++) {
-    onProgress(`Rendering della pagina ${n} di ${pdf.numPages}`);
+    onProgress(t.renderingPage(n, pdf.numPages));
     const page = await pdf.getPage(n);
     const viewport = page.getViewport({ scale: SCALE });
     canvas.width = Math.ceil(viewport.width);
@@ -200,10 +202,10 @@ export async function loadPages(
     if (lines.reduce((n, l) => n + l.text.length, 0) > TEXT_LAYER_MIN) {
       pages.push({ image: canvas.toDataURL("image/png"), lines, fromTextLayer: true });
     } else {
-      onProgress(`OCR sulla pagina ${n} di ${pdf.numPages}`);
+      onProgress(t.ocrOnPage(n, pdf.numPages));
       pages.push({
         image: canvas.toDataURL("image/png"),
-        lines: await ocr(await pngBytes(canvas)),
+        lines: await ocr(await pngBytes(canvas, t)),
         fromTextLayer: false,
       });
     }

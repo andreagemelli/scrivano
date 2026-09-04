@@ -76,3 +76,10 @@ export const DEFAULT_SAMPLING: Sampling = {
   maxTokens: 1024,
   seed: 42,
 };
+
+/**
+ * Decoding for the classification run. Greedy like extraction, but capped
+ * hard: the answer is one short object, and a model that starts looping should
+ * cost a moment, not the full token budget.
+ */
+export const CLASSIFY_SAMPLING: Sampling = { ...DEFAULT_SAMPLING, maxTokens: 64 };

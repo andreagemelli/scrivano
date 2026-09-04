@@ -106,23 +106,23 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: ${{ github.ref_type == 'tag' && format('Scrivano {0}', github.ref_name) || '' }}
           releaseBody: |
-            Versione beta. Il modello è un fine-tune da 350M su 149 documenti:
-            leggi sempre quello che estrae.
+            Beta. A 350M model doing document classification and key information
+            extraction in eight languages: always read what it gives you.
 
-            **macOS** — scarica il `.dmg`, trascina Scrivano in Applicazioni.
-            La build non è firmata, quindi al primo avvio macOS dice che
-            l'app è danneggiata. Si sblocca con:
+            **macOS** — download the `.dmg`, drag Scrivano into Applications.
+            The build is unsigned, so the first launch reports that the app is
+            damaged. Clear the quarantine once:
 
             ```
             xattr -dr com.apple.quarantine "/Applications/Scrivano.app"
             ```
 
-            **Windows** — scarica il `.exe` (installer NSIS) oppure il `.msi`.
-            SmartScreen segnala un editore sconosciuto: "Ulteriori informazioni"
-            poi "Esegui comunque".
+            **Windows** — download the `.exe` (NSIS installer) or the `.msi`.
+            SmartScreen reports an unknown publisher: "More info", then
+            "Run anyway".
 
-            Il modello (362 MiB) è già dentro l'installer: dopo l'installazione
-            non serve rete.
+            The model (362 MiB) is already inside the installer: nothing
+            downloads after installation.
           # A draft release is visible only to accounts with push access, so it
           # is not a download link for anyone else. Published, and flagged as a
           # prerelease because this is a beta.

@@ -1,8 +1,7 @@
 import { useState, type KeyboardEvent } from "react";
 import { CaretDown, Check, Plus, Question, Trash, Warning } from "@phosphor-icons/react";
+import { useT } from "./i18n";
 import type { Field } from "./types";
-
-const UNTRAINED = "Questa chiave non era nello schema di fine-tuning: il modello non l'ha mai vista.";
 
 /**
  * A list of name + description rows. Both things the model is handed have that
@@ -12,13 +11,18 @@ const UNTRAINED = "Questa chiave non era nello schema di fine-tuning: il modello
 export default function SchemaEditor({
   fields,
   known,
+  kind,
   onChange,
 }: {
   fields: Field[];
   /** Trained name → description. Drives the presets and the untrained flag. */
   known: Record<string, string>;
+  /** Which of the two lists this is. Only the words differ. */
+  kind: "field" | "class";
   onChange: (f: Field[]) => void;
 }) {
+  const shared = useT();
+  const t = shared.rows[kind];
   const [focus, setFocus] = useState(-1);
   const [menu, setMenu] = useState<"" | "preset" | "paste">("");
   const [filter, setFilter] = useState("");
@@ -64,7 +68,7 @@ export default function SchemaEditor({
     try {
       const obj: unknown = JSON.parse(json);
       if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
-        throw new Error("atteso un oggetto JSON che associa chiave e descrizione");
+        throw new Error(t.expectedObject);
       }
       onChange(
         Object.entries(obj as Record<string, unknown>).map(([key, d]) => ({
@@ -86,13 +90,10 @@ export default function SchemaEditor({
     <section className="group">
       {/* No title and no count here: the drawer's tab bar already carries both. */}
       <div className="group-head">
-        {/* The interface is Italian, the descriptions are not, and a user who
-            translates them is quietly making the extraction worse. Say it
-            once, here, where the descriptions are edited. */}
-        <span
-          className="help"
-          title="Le descrizioni finiscono nel prompt del modello, che è stato addestrato in inglese: lasciale in inglese. I preset portano già la formulazione con cui è stato addestrato."
-        >
+        {/* The model wants the prompt in the document's own language, and a
+            description written in another one quietly makes the answer worse.
+            Say it here, where the descriptions are edited. */}
+        <span className="help" title={t.help}>
           <Question size={14} weight="regular" />
         </span>
         <span className="grow" />
@@ -109,15 +110,15 @@ export default function SchemaEditor({
           }}
         >
           <button className="btn" onClick={() => setMenu(menu === "preset" ? "" : "preset")}>
-            Predefiniti
+            {shared.presets}
             <CaretDown size={12} weight="regular" />
           </button>
           {menu === "preset" && (
             <div className="popover">
               <input
                 autoFocus
-                placeholder="Filtra le chiavi"
-                aria-label="Filtra le chiavi predefinite"
+                placeholder={t.filter}
+                aria-label={t.filterLabel}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               />
@@ -136,11 +137,11 @@ export default function SchemaEditor({
                       onClick={() => pick(k)}
                     >
                       <span>{k}</span>
-                      {added && <Check size={13} weight="bold" aria-label="già nello schema" />}
+                      {added && <Check size={13} weight="bold" aria-label={t.alreadyIn} />}
                     </button>
                   );
                 })}
-                {keys.length === 0 && <p className="hint">Nessuna chiave corrisponde al filtro.</p>}
+                {keys.length === 0 && <p className="hint">{t.noMatch}</p>}
               </div>
             </div>
           )}
@@ -158,7 +159,7 @@ export default function SchemaEditor({
           }}
         >
           <button className="btn" onClick={() => setMenu(menu === "paste" ? "" : "paste")}>
-            Incolla JSON
+            {shared.pasteJson}
             <CaretDown size={12} weight="regular" />
           </button>
           {menu === "paste" && (
@@ -166,14 +167,14 @@ export default function SchemaEditor({
               <textarea
                 autoFocus
                 rows={7}
-                aria-label="Schema in formato JSON"
-                placeholder={'{ "nome": "the first name of a person" }'}
+                aria-label={t.jsonLabel}
+                placeholder={t.jsonPlaceholder}
                 value={json}
                 onChange={(e) => setJson(e.target.value)}
               />
               <div className="popfoot">
                 <button className="btn" onClick={applyJson}>
-                  Sostituisci tutti i campi
+                  {t.replaceAll}
                 </button>
                 {jsonError !== "" && <span className="err-text">{jsonError}</span>}
               </div>
@@ -188,8 +189,8 @@ export default function SchemaEditor({
             <div className="field-body">
               <input
                 className="k"
-                placeholder="chiave"
-                aria-label={`Chiave del campo ${i + 1}`}
+                placeholder={t.namePlaceholder}
+                aria-label={t.nameLabel(i + 1)}
                 value={f.key}
                 ref={(el) => {
                   if (el && i === focus) {
@@ -206,29 +207,29 @@ export default function SchemaEditor({
               <textarea
                 className="d"
                 rows={1}
-                aria-label={`Descrizione del campo ${i + 1}`}
+                aria-label={t.descriptionLabel(i + 1)}
                 ref={(el) => {
                   if (el) {
                     el.style.height = "0";
                     el.style.height = `${el.scrollHeight}px`;
                   }
                 }}
-                placeholder="che cosa significa questo campo"
+                placeholder={t.descriptionPlaceholder}
                 value={f.description}
                 onChange={(e) => set(i, { ...f, description: e.target.value })}
                 onKeyDown={(e) => onKeyDown(e, i, false)}
               />
               {f.key.trim() !== "" && !(f.key in known) && (
-                <span className="flag" title={UNTRAINED}>
+                <span className="flag" title={t.untrainedHelp}>
                   <Warning size={13} weight="regular" />
-                  chiave non addestrata
+                  {t.untrained}
                 </span>
               )}
             </div>
             <button
               className="icon-btn field-del"
-              aria-label={`Rimuovi ${f.key.trim() === "" ? "il campo" : f.key}`}
-              title={`Rimuovi ${f.key.trim() === "" ? "il campo" : f.key}`}
+              aria-label={shared.removeRow(f.key.trim() === "" ? t.theRow : f.key)}
+              title={shared.removeRow(f.key.trim() === "" ? t.theRow : f.key)}
               onClick={() => remove(i)}
             >
               <Trash size={15} weight="regular" />
@@ -236,13 +237,13 @@ export default function SchemaEditor({
           </div>
         ))}
         {fields.length === 0 && (
-          <p className="hint">Nessun campo. Aggiungine uno per poter estrarre qualcosa.</p>
+          <p className="hint">{t.empty}</p>
         )}
       </div>
 
       <button className="btn" onClick={() => addAfter(fields.length - 1)}>
         <Plus size={14} weight="regular" />
-        Aggiungi campo
+        {t.add}
       </button>
     </section>
   );
