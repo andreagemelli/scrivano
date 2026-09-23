@@ -113,7 +113,8 @@ const EN = {
   schemaCount: (n: number) => `Schema · ${count(n, "field", "fields")}`,
   speedHelp:
     "How fast the model writes, in tokens per second. Measured from the first token, so it excludes reading the prompt.",
-  valuesEditable: "Values are editable. Hover one to find it in the document text.",
+  valuesEditable:
+    "Values are editable. Hover one to find it in the document. The eye beside a key hides its value, in the JSON and in the document.",
   fieldsView: "Fields",
   jsonView: "JSON",
   copied: "Copied",
@@ -128,6 +129,35 @@ const EN = {
   notOnPage: "not in the document",
   notOnPageHelp:
     "This text appears nowhere in the document, so the model most likely invented it.",
+  // Hiding a value
+  hideValue: (key: string) => `Hide ${key}`,
+  hiddenValue: (key: string) => `${key}, hidden`,
+  hiddenHelp:
+    "Hidden. The JSON you copy or download says [REDACTED] instead, and wherever the value occurs in the document it is blacked out, on the page and in the text. Click to show it again.",
+  notBlackedOut: "not blacked out",
+  notBlackedOutHelp:
+    "This value is hidden in the JSON, but it was not found on its own in the document's text, so wherever it appears on the page it is not blacked out. Check the page before you share it. If the value is wrong, open the eye, correct it to read exactly as on the page, then close the eye again.",
+  copyText: (n: number) =>
+    n === 0 ? "Copy the document text" : `Copy the document text, ${count(n, "hidden value", "hidden values")} replaced`,
+  downloadPdf: (n: number) =>
+    n === 0
+      ? "Download the document as a PDF"
+      : `Download the document as a PDF, ${count(n, "hidden value", "hidden values")} blacked out`,
+  unplaced: (n: number) =>
+    n === 1
+      ? "A hidden value sits on a line with no position on the page, so a PDF cannot black it out. The text copy still masks it."
+      : `Hidden values sit on ${n} lines with no position on the page, so a PDF cannot black them out. The text copy still masks them.`,
+  hiddenUnsettled:
+    "A field is hidden, but there is no extraction to take its value from, so nothing can be blacked out yet. Run Extract before you copy or download this document.",
+  hiddenNotFound: (n: number) =>
+    n === 1
+      ? "A hidden value was not found in the document's text, so it is not blacked out wherever it appears on the page. Check the page before you share it."
+      : `${n} hidden values were not found in the document's text, so they are not blacked out wherever they appear on the page. Check the page before you share it.`,
+  hiddenPictures:
+    "This PDF also draws pictures or form fields, which can show a value its text does not carry. Hidden values are found by that text, so check those parts of the page before you share it.",
+  rawWithheld:
+    "The model's answer did not parse, so a hidden value in it cannot be told apart from the rest. It is shown here but not copied or downloaded.",
+  pdfFailed: (detail: string) => `Could not write the PDF. ${detail}`,
   emptyFields: (n: number) => count(n, "field with no value", "fields with no value"),
   emptyFieldsHelp: (n: number): string =>
     n === 1
@@ -341,7 +371,7 @@ const IT: Dict = {
   speedHelp:
     "Velocità di generazione del modello, token al secondo. Misurata dal primo token, quindi non include la lettura del prompt.",
   valuesEditable:
-    "I valori sono modificabili. Passa il puntatore su uno per trovarlo nel testo del documento.",
+    "I valori sono modificabili. Passa il puntatore su uno per trovarlo nel documento. L'occhio accanto a una chiave ne nasconde il valore, nel JSON e nel documento.",
   fieldsView: "Campi",
   jsonView: "JSON",
   copied: "Copiato",
@@ -356,6 +386,34 @@ const IT: Dict = {
   notOnPage: "non nel documento",
   notOnPageHelp:
     "Questo testo non compare da nessuna parte nel documento, quindi il modello lo ha probabilmente inventato.",
+  hideValue: (key) => `Nascondi ${key}`,
+  hiddenValue: (key) => `${key}, nascosto`,
+  hiddenHelp:
+    "Nascosto. Il JSON che copi o scarichi riporta [REDACTED] al suo posto, e ovunque il valore compaia nel documento viene oscurato, sulla pagina e nel testo. Fai clic per mostrarlo di nuovo.",
+  notBlackedOut: "non oscurato",
+  notBlackedOutHelp:
+    "Questo valore è nascosto nel JSON, ma non è stato trovato a sé nel testo del documento, quindi dove compare sulla pagina non viene oscurato. Controlla la pagina prima di condividerla. Se il valore è sbagliato, apri l'occhio, correggilo perché si legga esattamente come sulla pagina, poi richiudi l'occhio.",
+  copyText: (n) =>
+    n === 0 ? "Copia il testo del documento" : `Copia il testo del documento, con ${count(n, "valore nascosto sostituito", "valori nascosti sostituiti")}`,
+  downloadPdf: (n) =>
+    n === 0
+      ? "Scarica il documento in PDF"
+      : `Scarica il documento in PDF, con ${count(n, "valore nascosto oscurato", "valori nascosti oscurati")}`,
+  unplaced: (n) =>
+    n === 1
+      ? "Un valore nascosto si trova su una riga senza posizione sulla pagina, quindi un PDF non può oscurarlo. La copia del testo lo maschera comunque."
+      : `Dei valori nascosti si trovano su ${n} righe senza posizione sulla pagina, quindi un PDF non può oscurarli. La copia del testo li maschera comunque.`,
+  hiddenUnsettled:
+    "Un campo è nascosto, ma non c'è un'estrazione da cui prenderne il valore, quindi per ora non si può oscurare nulla. Esegui Estrai prima di copiare o scaricare questo documento.",
+  hiddenNotFound: (n) =>
+    n === 1
+      ? "Un valore nascosto non è stato trovato nel testo del documento, quindi non viene oscurato dove compare sulla pagina. Controlla la pagina prima di condividerla."
+      : `${n} valori nascosti non sono stati trovati nel testo del documento, quindi non vengono oscurati dove compaiono sulla pagina. Controlla la pagina prima di condividerla.`,
+  hiddenPictures:
+    "Questo PDF contiene anche immagini o campi di modulo, che possono mostrare un valore assente dal suo testo. I valori nascosti vengono cercati in quel testo, quindi controlla quelle parti della pagina prima di condividerla.",
+  rawWithheld:
+    "La risposta del modello non è un JSON valido, quindi un valore nascosto non si distingue dal resto. È mostrata qui ma non viene copiata né scaricata.",
+  pdfFailed: (detail) => `Impossibile scrivere il PDF. ${detail}`,
   emptyFields: (n) => count(n, "campo senza valore", "campi senza valore"),
   emptyFieldsHelp: (n) =>
     n === 1

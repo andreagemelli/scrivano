@@ -304,6 +304,7 @@ button, input, textarea { font: inherit; color: inherit; }
   line-height: 1.5;
 }
 .warn-note > svg { flex: none; margin-top: 1px; }
+.doc-pane .warn-note { margin-bottom: 12px; }
 
 /* Decode rate, in the extraction panel header. Mono so the number does not
    shuffle the row every time a digit changes width. */
@@ -788,7 +789,7 @@ button, input, textarea { font: inherit; color: inherit; }
   cursor: pointer;
 }
 .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
-.icon-btn:disabled { color: var(--ink-3); background: transparent; cursor: not-allowed; }
+.icon-btn:disabled, .icon-btn[aria-disabled="true"] { color: var(--ink-3); background: transparent; cursor: not-allowed; }
 
 /* A count that is also the way in to the schema. */
 .link-btn {
@@ -859,6 +860,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .page-num { display: flex; align-items: center; font-size: var(--t-meta); color: var(--ink-2); }
 .page-img {
   display: block;
+  -webkit-user-drag: none;
   max-width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--r-ctl);
@@ -868,6 +870,9 @@ button, input, textarea { font: inherit; color: inherit; }
 .shot { position: relative; width: fit-content; max-width: 100%; }
 /* Inset by the image border, so a rect lands on the pixels and not the frame. */
 .marks { position: absolute; inset: 1px; pointer-events: none; }
+/* A hidden value on the page. Black in both themes: it is paint on the
+   document, exactly what the exported PDF will carry, not a UI surface. */
+.blackout { position: absolute; background: #000; }
 .mark {
   position: absolute;
   border: 1px solid var(--mark);
@@ -943,6 +948,32 @@ button, input, textarea { font: inherit; color: inherit; }
 .fvalue { width: 100%; }
 .frow .flag { grid-column: 2; justify-self: start; }
 
+/* The eye on a field. Small and quiet while the value shows; once closed it is
+   ink, because a hidden value is a decision someone made and it should read as
+   one. In the JSON view it sits in the row's left gutter, so the braces and
+   keys keep the column they always had. */
+.eye { width: 22px; height: 22px; color: var(--ink-3); }
+.eye.closed { color: var(--ink); }
+.jrow .eye { margin-left: -21px; margin-right: 1px; }
+.flabel { display: flex; align-items: center; gap: 4px; }
+.flabel .eye { margin-left: -4px; }
+/* A hidden value, drawn as the mask it leaves the app as. Inverse ink rather
+   than a colour: it is the on-screen twin of the black box on the page. */
+.redacted {
+  border-radius: 3px;
+  padding: 0 3px;
+  background: var(--ink);
+  color: var(--surface);
+  user-select: all;
+}
+.jval.redacted {
+  display: inline-flex;
+  align-items: center;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
 /* Nothing came back for these keys. A different thing from the amber flag on a
    value that is not on the page, so it is a section, not a chip. */
 .nofound {
@@ -986,6 +1017,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .preview .brace { padding: 0; }
 .preview-row { display: flex; gap: 0; padding: 2px 8px 2px 20px; color: var(--ink-3); }
 .preview-row .jkey { color: var(--ink-3); font-weight: 400; }
+.preview-eye { flex: none; align-self: center; margin-left: -18px; margin-right: 5px; color: var(--ink-2); }
 
 .raw {
   margin: 0;
@@ -1076,6 +1108,11 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 .field-del { grid-column: 2; grid-row: 1; align-self: center; }
 .field-flag { grid-column: 1; grid-row: 2; justify-self: start; }
+/* A schema row leads with its eye, as an extracted value does. */
+.field.with-eye { grid-template-columns: auto 1fr auto; }
+.field.with-eye > .eye { grid-column: 1; grid-row: 1; align-self: center; }
+.field.with-eye > .field-body, .field.with-eye > .field-flag { grid-column: 2; }
+.field.with-eye > .field-del { grid-column: 3; }
 .field .k, .field .d {
   padding: 6px 8px;
   border: 0;

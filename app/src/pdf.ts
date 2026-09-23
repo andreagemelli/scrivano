@@ -1,8 +1,10 @@
 import { readFile } from "@tauri-apps/plugin-fs";
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import { getDocument, GlobalWorkerOptions, OPS } from "pdfjs-dist";
+import type { PDFPageProxy } from "pdfjs-dist";
 import { ocr } from "./api";
+import { SPACELESS } from "./redact";
 import type { Dict } from "./i18n";
-import type { Box, Line, Page } from "./types";
+import type { Box, Line, Page, Run } from "./types";
 
 // Served by vite-plugin-static-copy with the upsert polyfill prepended.
 // Do not swap this back to a ?url import: WebKit needs that prefix.
@@ -53,18 +55,6 @@ function mul(a: number[], b: number[]): number[] {
 const clamp = (n: number) => Math.min(1, Math.max(0, n));
 
 /**
- * Box for one text item, normalised against the rendered page, or undefined.
- *
- * Item transforms are in unrotated PDF user space with the origin bottom left,
- * so this composes the same flip pdf.js TextLayer uses and divides by the raw
- * page size, which lands straight in 0..1 with no scale involved. `width` is in
- * those same units. The rect is the baseline origin raised by the full font
- * height, which is what a highlight should cover.
- *
- * A rotated page or a rotated/skewed run gets no box: an axis-aligned rect from
- * those numbers would be a guess, and a wrong box is worse than none.
- */
-/**
  * Join text-layer fragments that sit on the same visual line.
  *
  * pdf.js emits one item per styling run, so a single printed line arrives as
@@ -90,16 +80,29 @@ export function mergeIntoLines(fragments: Line[]): Line[] {
     // run like a codice fiscale arrives one glyph at a time with hairline gaps, and
     // joining those with spaces produced "G R D L S M 8 8 ...". A real word gap is
     // roughly a quarter of the line height, so anything tighter is one token.
-    let text = "";
+    let raw = "";
     let prevRight: number | null = null;
+    // Where each fragment starts in the joined text, so part of the line can
+    // still be placed on the page after the fragments are gone.
+    const starts: { at: number; box: Box }[] = [];
     for (const f of ordered) {
       const gap = f.box && prevRight !== null ? f.box.x - prevRight : null;
       const apart = gap === null || gap > f.box!.h * 0.25;
-      if (text !== "" && apart) text += " ";
-      text += f.text;
+      if (raw !== "" && apart) raw += " ";
+      if (f.box) starts.push({ at: raw.length, box: f.box });
+      raw += f.text;
       prevRight = f.box ? f.box.x + f.box.w : prevRight;
     }
-    text = text.replace(/\s+/g, " ").trim();
+    const { text, at } = squash(raw);
+    // A fragment's own word runs when it was measured, else the fragment is one.
+    const runs = starts.flatMap((st, i) =>
+      (ordered[i].runs ?? [{ at: 0, x: st.box.x, w: st.box.w }]).map((r) => ({
+        at: at[st.at + r.at],
+        x: r.x,
+        w: r.w,
+      })),
+    );
+    const measured = ordered.some((f) => f.runs);
     const boxes = ordered.map((f) => f.box).filter((b): b is Box => b !== undefined);
     const x = Math.min(...boxes.map((b) => b.x));
     const y = Math.min(...boxes.map((b) => b.y));
@@ -111,6 +114,7 @@ export function mergeIntoLines(fragments: Line[]): Line[] {
         w: Math.max(...boxes.map((b) => b.x + b.w)) - x,
         h: Math.max(...boxes.map((b) => b.y + b.h)) - y,
       },
+      ...((measured || starts.length > 1) && { runs }),
     });
     run = [];
   };
@@ -133,6 +137,99 @@ export function mergeIntoLines(fragments: Line[]): Line[] {
   }
   flush();
   return out;
+}
+
+/**
+ * Where each word of one text item sits. The item's width in the PDF is exact;
+ * measuring its prefixes in the item's own font splits that width between the
+ * words, so a hidden value can be boxed without spreading a whole line evenly.
+ * pdf.js registers every font it renders under the item's `fontName`, and the
+ * page is rendered before its text is read, so the measure is the real font.
+ */
+export function wordRuns(text: string, box: Box, measure: (s: string) => number): Run[] | undefined {
+  const total = measure(text);
+  if (!(total > 0)) return undefined;
+  // A word is a run of non-space characters; in a script written without
+  // spaces every character is its own.
+  const words: [number, number][] = [];
+  for (let i = 0; i < text.length; ) {
+    const c = String.fromCodePoint(text.codePointAt(i)!);
+    const open = words[words.length - 1];
+    if (/\s/.test(c)) {
+      // nothing: a space ends the word before it
+    } else if (open && open[1] === i && !SPACELESS.test(c) && !SPACELESS.test(text[open[0]])) {
+      open[1] = i + c.length;
+    } else {
+      words.push([i, i + c.length]);
+    }
+    i += c.length;
+  }
+  return words.map(([a, b]) => {
+    const x0 = measure(text.slice(0, a)) / total;
+    const x1 = measure(text.slice(0, b)) / total;
+    return { at: a, x: box.x + box.w * x0, w: box.w * (x1 - x0) };
+  });
+}
+
+/**
+ * `raw.replace(/\s+/g, " ").trim()`, which is what the model is fed, plus where
+ * each character of `raw` landed in it. The text must not change by a byte: the
+ * map is bookkeeping for redaction, not a new normalisation.
+ */
+export function squash(raw: string): { text: string; at: number[] } {
+  let text = "";
+  let gap = false;
+  const at: number[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (/\s/.test(c)) {
+      gap = text !== "";
+      at[i] = text.length;
+      continue;
+    }
+    if (gap) text += " ";
+    gap = false;
+    at[i] = text.length;
+    text += c;
+  }
+  return { text, at };
+}
+
+/**
+ * Box for one text item, normalised against the rendered page, or undefined.
+ *
+ * Item transforms are in unrotated PDF user space with the origin bottom left,
+ * so this composes the same flip pdf.js TextLayer uses and divides by the raw
+ * page size, which lands straight in 0..1 with no scale involved. `width` is in
+ * those same units. The rect is the baseline origin raised by the full font
+ * height, which is what a highlight should cover.
+ *
+ * A rotated page or a rotated/skewed run gets no box: an axis-aligned rect from
+ * those numbers would be a guess, and a wrong box is worse than none.
+ */
+/** Every pdf.js operator that paints an image onto the page. */
+const PICTURE_OPS = new Set<number>([
+  OPS.paintImageXObject,
+  OPS.paintInlineImageXObject,
+  OPS.paintImageMaskXObject,
+  OPS.paintImageXObjectRepeat,
+  OPS.paintImageMaskXObjectRepeat,
+  OPS.paintInlineImageXObjectGroup,
+  OPS.paintImageMaskXObjectGroup,
+]);
+
+/**
+ * Whether a page draws anything its text layer does not carry: a picture (a
+ * scanned ID card pasted into a form) or a form field (a value typed into a
+ * fillable PDF lives in the field, not in the page's text). Either can show a
+ * value the text layer does not, so hiding by the text cannot promise it.
+ *
+ * ponytail: a warning, not a search. OCR such pages as well if it matters.
+ */
+async function hasPictures(page: PDFPageProxy): Promise<boolean> {
+  const ops = await page.getOperatorList();
+  if (ops.fnArray.some((f) => PICTURE_OPS.has(f))) return true;
+  return (await page.getAnnotations()).some((a) => a.subtype === "Widget");
 }
 
 function itemBox(
@@ -175,6 +272,7 @@ export async function loadPages(
   }).promise;
 
   const canvas = document.createElement("canvas");
+  const ruler = document.createElement("canvas").getContext("2d")!;
   const pages: Page[] = [];
   for (let n = 1; n <= pdf.numPages; n++) {
     onProgress(t.renderingPage(n, pdf.numPages));
@@ -195,12 +293,26 @@ export async function loadPages(
     const fragments: Line[] = [];
     for (const i of text.items) {
       if (!("str" in i) || i.str.trim() === "") continue;
-      fragments.push({ text: i.str, box: upright ? itemBox(i, dims) : undefined });
+      // Vertical writing (tategaki) runs down the page, and itemBox is laid out
+      // across it, so its rect would sit beside the column. None is better:
+      // a value there is masked in the text and the PDF export is refused.
+      const box = upright && !text.styles[i.fontName]?.vertical ? itemBox(i, dims) : undefined;
+      ruler.font = `100px "${i.fontName}", sans-serif`;
+      fragments.push({
+        text: i.str,
+        box,
+        runs: box && wordRuns(i.str, box, (t) => ruler.measureText(t).width),
+      });
     }
     const lines = mergeIntoLines(fragments);
 
     if (lines.reduce((n, l) => n + l.text.length, 0) > TEXT_LAYER_MIN) {
-      pages.push({ image: canvas.toDataURL("image/png"), lines, fromTextLayer: true });
+      pages.push({
+        image: canvas.toDataURL("image/png"),
+        lines,
+        fromTextLayer: true,
+        pictures: await hasPictures(page),
+      });
     } else {
       onProgress(t.ocrOnPage(n, pdf.numPages));
       pages.push({

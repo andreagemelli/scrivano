@@ -1,11 +1,44 @@
 import { useState } from "react";
-import { Copy, DownloadSimple, Question, Warning } from "@phosphor-icons/react";
+import { Copy, DownloadSimple, Eye, EyeSlash, Question, Warning } from "@phosphor-icons/react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { isGrounded } from "./prompt";
+import { REDACTED, shownResult } from "./redact";
 import { useT } from "./i18n";
 import type { Doc, Field } from "./types";
+
+/**
+ * The eye on a row. Leads it, so it sits in the same column in both views and
+ * never wraps away from the value it hides.
+ */
+function EyeToggle({ hidden, name, onToggle }: { hidden: boolean; name: string; onToggle: () => void }) {
+  const t = useT();
+  // One name, whatever the state: aria-pressed says which, and a label that
+  // flipped to "Show" while pressed would read as the opposite of the truth.
+  const label = t.hideValue(name);
+  return (
+    <button
+      className={hidden ? "icon-btn eye closed" : "icon-btn eye"}
+      aria-label={label}
+      aria-pressed={hidden}
+      data-hint={hidden ? t.hiddenHelp : label}
+      onClick={onToggle}
+    >
+      {hidden ? <EyeSlash size={14} weight="regular" /> : <Eye size={14} weight="regular" />}
+    </button>
+  );
+}
+
+/** A hidden value, drawn exactly as it leaves the app: the mask, not the value. */
+function Masked({ name }: { name: string }) {
+  const t = useT();
+  return (
+    <span className="jval redacted" aria-label={t.hiddenValue(name)}>
+      {REDACTED}
+    </span>
+  );
+}
 
 /** Rate readout. Two significant figures is all the precision this number has. */
 function Speed({ tps, live, help }: { tps: number; live: boolean; help: string }) {
@@ -25,6 +58,8 @@ export default function Results({
   speed,
   onEdit,
   onHover,
+  onHide,
+  notFound,
   onSettings,
 }: {
   doc: Doc | null;
@@ -36,6 +71,10 @@ export default function Results({
   onEdit: (result: Record<string, string>) => void;
   /** The text the document pane should point at, or null on leave. */
   onHover: (value: string | null) => void;
+  /** Opens or closes the eye on one field. */
+  onHide: (key: string) => void;
+  /** Hidden values that occur nowhere on the page, so nothing could be blacked out. */
+  notFound: string[];
   /** Opens the settings drawer on the schema. */
   onSettings: () => void;
 }) {
@@ -49,7 +88,13 @@ export default function Results({
   const extracting = doc?.status === "extracting";
   const result = doc?.result;
   const lines = doc ? doc.pages.flatMap((p) => p.lines.map((l) => l.text)) : [];
-  const text = result ? JSON.stringify(result, null, 2) : (doc?.raw ?? "");
+  const hidden = new Set(fields.filter((f) => f.hidden).map((f) => f.key));
+  // What Copy and Download hand over: exactly the rows on screen, hidden ones
+  // masked. The raw output, when there is no parsed result, has nothing to tell
+  // a hidden value apart by, so it is shown here but not handed over while any
+  // field is hidden.
+  const text = result ? JSON.stringify(shownResult(result, fields), null, 2) : (doc?.raw ?? "");
+  const withheld = !result && hidden.size > 0;
   // Field order, not model order, so the same schema always reads the same way.
   const keys = result ? fields.map((f) => f.key).filter((k) => k in result) : [];
   const missing = result ? fields.filter((f) => !(f.key in result)).map((f) => f.key) : [];
@@ -79,6 +124,29 @@ export default function Results({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /**
+   * At most one flag per row, and the louder one wins. A hidden value that is
+   * not on the page is worse news than an invented one: it was meant to be
+   * blacked out, and nothing on the page could be.
+   */
+  function flag(hidden: boolean, value: string) {
+    if (hidden && notFound.includes(value)) {
+      return (
+        <span className="flag" data-hint={t.notBlackedOutHelp}>
+          <Warning size={13} weight="regular" />
+          {t.notBlackedOut}
+        </span>
+      );
+    }
+    if (isGrounded(value, lines)) return null;
+    return (
+      <span className="flag" data-hint={t.notOnPageHelp}>
+        <Warning size={13} weight="regular" />
+        {t.notOnPage}
+      </span>
+    );
   }
 
   function edit(key: string, value: string) {
@@ -117,17 +185,26 @@ export default function Results({
         )}
         {/* The two actions travel together. This header wraps rather than clips,
             and a lone download button on a second row reads as a mistake. */}
-        {text !== "" && (
+        {text !== "" && !extracting && (
           <span className="panel-actions">
             {copied && <span className="muted">{t.copied}</span>}
-            <button className="icon-btn" aria-label={t.copyJson} data-hint={t.copyJson} onClick={copy}>
+            {/* aria-disabled rather than disabled: WebKit sends no pointer
+                events to a disabled button, and the hint is the explanation. */}
+            <button
+              className="icon-btn"
+              aria-label={withheld ? t.rawWithheld : t.copyJson}
+              aria-disabled={withheld || undefined}
+              data-hint={withheld ? t.rawWithheld : t.copyJson}
+              onClick={() => !withheld && copy()}
+            >
               <Copy size={16} weight="regular" />
             </button>
             <button
               className="icon-btn"
-              aria-label={t.downloadJson}
-              data-hint={t.downloadJson}
-              onClick={download}
+              aria-label={withheld ? t.rawWithheld : t.downloadJson}
+              aria-disabled={withheld || undefined}
+              data-hint={withheld ? t.rawWithheld : t.downloadJson}
+              onClick={() => !withheld && download()}
             >
               <DownloadSimple size={16} weight="regular" />
             </button>
@@ -158,6 +235,8 @@ export default function Results({
                 <div className="brace">{"{"}</div>
                 {fields.map((f) => (
                   <div className="preview-row" key={f.key}>
+                    {/* Which fields will come out masked, before there is anything to mask. */}
+                    {f.hidden && <EyeSlash className="preview-eye" size={13} weight="regular" />}
                     <span className="jkey">"{f.key}"</span>
                     <span className="jpunct">:</span>
                     <span className="jghost">""</span>
@@ -193,21 +272,23 @@ export default function Results({
                     onMouseEnter={() => onHover(value)}
                     onMouseLeave={() => onHover(null)}
                   >
-                    <span className="flabel">{key}</span>
-                    <input
-                      className="jval fvalue"
-                      aria-label={t.valueOf(key)}
-                      value={value}
-                      onChange={(e) => edit(key, e.target.value)}
-                      onFocus={() => onHover(value)}
-                      onBlur={() => onHover(null)}
-                    />
-                    {!isGrounded(value, lines) && (
-                      <span className="flag" data-hint={t.notOnPageHelp}>
-                        <Warning size={13} weight="regular" />
-                        {t.notOnPage}
-                      </span>
+                    <span className="flabel">
+                      <EyeToggle hidden={hidden.has(key)} name={key} onToggle={() => onHide(key)} />
+                      {key}
+                    </span>
+                    {hidden.has(key) ? (
+                      <Masked name={key} />
+                    ) : (
+                      <input
+                        className="jval fvalue"
+                        aria-label={t.valueOf(key)}
+                        value={value}
+                        onChange={(e) => edit(key, e.target.value)}
+                        onFocus={() => onHover(value)}
+                        onBlur={() => onHover(null)}
+                      />
                     )}
+                    {flag(hidden.has(key), value)}
                   </div>
                 );
               })}
@@ -238,7 +319,6 @@ export default function Results({
               <div className="brace">{"{"}</div>
               {keys.map((key, i) => {
                 const value = result[key];
-                const grounded = isGrounded(value, lines);
                 return (
                   <div
                     className="jrow"
@@ -246,29 +326,29 @@ export default function Results({
                     onMouseEnter={() => onHover(value)}
                     onMouseLeave={() => onHover(null)}
                   >
+                    <EyeToggle hidden={hidden.has(key)} name={key} onToggle={() => onHide(key)} />
                     <span className="jkey">"{key}"</span>
                     <span className="jpunct">:</span>
                     <span className="jquote">"</span>
-                    <input
-                      className="jval"
-                      aria-label={t.valueOf(key)}
-                      value={value}
-                      // A mono input sized to its text plus its own padding and
-                      // border, so the JSON keeps its shape and nothing is clipped.
-                      style={{ width: `calc(${Math.max(value.length, 3)}ch + 14px)` }}
-                      onChange={(e) => edit(key, e.target.value)}
-                      onFocus={() => onHover(value)}
-                      onBlur={() => onHover(null)}
-                    />
+                    {hidden.has(key) ? (
+                      <Masked name={key} />
+                    ) : (
+                      <input
+                        className="jval"
+                        aria-label={t.valueOf(key)}
+                        value={value}
+                        // A mono input sized to its text plus its own padding and
+                        // border, so the JSON keeps its shape and nothing is clipped.
+                        style={{ width: `calc(${Math.max(value.length, 3)}ch + 14px)` }}
+                        onChange={(e) => edit(key, e.target.value)}
+                        onFocus={() => onHover(value)}
+                        onBlur={() => onHover(null)}
+                      />
+                    )}
                     {/* Closing quote and comma travel together, so a wrap never
                         strands a comma on a line of its own. */}
                     <span className="jquote">"{i < keys.length - 1 ? "," : ""}</span>
-                    {!grounded && (
-                      <span className="flag" data-hint={t.notOnPageHelp}>
-                        <Warning size={13} weight="regular" />
-                        {t.notOnPage}
-                      </span>
-                    )}
+                    {flag(hidden.has(key), value)}
                   </div>
                 );
               })}

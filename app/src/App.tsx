@@ -6,6 +6,7 @@ import { backendStatus, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
 import { DEFAULT_PREFS, FIRST_PROJECT, loadDocs, loadPrefs, saveDocs, savePrefs } from "./store";
 import { buildPrompt, parseAnswer, parseClass } from "./prompt";
+import { hiddenValues, locate } from "./redact";
 import { classAlias, classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
 import { DICTS, Words } from "./i18n";
 import Hints from "./Hints";
@@ -116,6 +117,14 @@ export default function App() {
   );
   const fields = doc ? doc.fields : draft;
   const sampling = doc ? (doc.sampling ?? DEFAULT_SAMPLING) : draftSampling;
+  // Where the hidden values sit on the page. Both panes read the same answer,
+  // so the JSON never claims a value is blacked out that the page still shows.
+  const hiding = doc ? hiddenValues(doc.fields, doc.result) : [];
+  const located = doc && hiding.length > 0 ? locate(doc.pages, hiding) : { spans: [], missing: [] };
+  // A field is hidden but there is no extraction to take its value from — none
+  // yet, one in flight, or one that failed — so nothing can be blacked out, and
+  // nothing the document pane would export is safe to hand over.
+  const unsettled = doc !== null && doc.result === undefined && doc.fields.some((f) => f.hidden);
 
   // The drag listener is registered once, so everything addPath needs is read
   // through refs at call time rather than captured at mount.
@@ -430,6 +439,18 @@ export default function App() {
     if (doc) patch(doc.id, { fields: next });
   }
 
+  /**
+   * The eye on one field. It lives on the schema, so the next document inherits
+   * it — but only the flag goes to the draft. Handing the draft this document's
+   * whole schema would make an old document's keys the template for new ones.
+   */
+  function toggleHidden(key: string) {
+    const hidden = !fields.find((f) => f.key === key)?.hidden;
+    const flip = (fs: Field[]) => fs.map((f) => (f.key === key ? { ...f, hidden } : f));
+    setDraft(flip);
+    if (doc) patch(doc.id, { fields: flip(doc.fields) });
+  }
+
   function setSampling(next: Sampling) {
     setDraftSampling(next);
     if (doc) patch(doc.id, { sampling: next });
@@ -588,6 +609,10 @@ export default function App() {
               dragging={dragging}
               dropError={dropError}
               highlight={highlight}
+              spans={located.spans}
+              hiddenCount={hiding.length - located.missing.length}
+              notFound={located.missing.length}
+              unsettled={unsettled}
               onAdd={pickDocument}
             />
             {/* Source on the left, output on the right. */}
@@ -601,6 +626,8 @@ export default function App() {
               speed={speed}
               onEdit={(result) => doc && patch(doc.id, { result })}
               onHover={setHighlight}
+              onHide={toggleHidden}
+              notFound={located.missing}
               onSettings={() => setSettings(true)}
             />
           </main>
@@ -665,7 +692,11 @@ function merge(cur: Doc[], stored: Doc[]): Doc[] {
   return add.length === 0 ? cur : [...cur, ...add];
 }
 
-/** Two schemas naming the same keys in the same order: nobody has edited this one. */
+/**
+ * Two schemas naming the same keys in the same order: nobody has edited this
+ * one. A closed eye is an edit too — swapping such a schema for a fresh preset
+ * would quietly open it again.
+ */
 function sameKeys(a: Field[], b: Field[]): boolean {
-  return a.length === b.length && a.every((f, i) => f.key === b[i].key);
+  return a.length === b.length && a.every((f, i) => f.key === b[i].key && !f.hidden);
 }
