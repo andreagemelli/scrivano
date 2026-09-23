@@ -12,7 +12,7 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 > **The project born as a toy excercise for finetuning and extending LFM-2.5-350M for italian and KIE. I am now having fun adding new capabilities!**
 
-![beta](https://img.shields.io/badge/release-0.4.0--beta-1d4ed8)
+![beta](https://img.shields.io/badge/release-0.5.0--beta-1d4ed8)
 ![macOS](https://img.shields.io/badge/macOS-supported-informational)
 ![Windows](https://img.shields.io/badge/Windows-supported-informational)
 ![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-lightgrey)
@@ -21,35 +21,29 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 ![Scrivano: a residence declaration classified and extracted, with the folder it was filed in](docs/screenshot-app.png)
 
-## What is new in 0.4.0
+## What is new in 0.5.0
 
-**The page says what language it is in.** Until now a folder said it, and a German page in a folder
-of Italian ones got an Italian schema unless someone remembered to change it — which matters,
-because keys, descriptions and class names go into the prompt in the document's language, and an
-English schema over an Italian page measurably invents values.
+**Classify again, when you ask.** The class used to be asked for once, the moment a document
+opened, and then never again — so editing a folder's class list changed nothing for the documents
+already in it, and a class no longer on the list stayed on them.
 
-- **Detected on open**, with fastText's `lid.176` (176 languages, under a megabyte, offline like
-  everything else), narrowed to the model's eight. On the 458 validation pages of
-  `xfund-docai-xl` it names the right language for 450, leaves three sparse memos to the folder's,
-  and calls five English — English form templates filled in with German, Spanish and Portuguese
-  values.
-- **The folder's language becomes the fallback**: for a page in none of the eight, one with too
-  few letters to tell, or one detection is less than even sure of. It can be switched off per
-  folder, and one document's language can still be changed by hand in the extraction settings.
-- **What can follow it, does.** An untouched preset becomes that language's preset. While the
-  folder's class list is still the trained twelve, the model is shown it in the page's language,
-  and the answer is filed under the folder's own name for the class, so a folder of mixed pages
-  still groups under one set of tags. An edited schema or class list is somebody's work and goes
-  as written.
-- The document's language sits in the top bar, and says where it came from: the page, a choice,
-  or the folder.
-- The eye from 0.3.0 is now remembered by what a field means, not by its key, so an eye closed on
-  `cognome` is closed on `nachname`. One with no counterpart in the new language comes along as its
-  own row, still closed, and a full name closes with either of its parts: swapping a schema for
-  another language's preset never opens an eye by the way.
+- **One document**: the arrows beside its class tag in the top bar ask again, with the folder's
+  list as it is now. A document with no class has a dashed *Classify* tag in the same place, even
+  in a folder that does not classify on open.
+- **A whole folder**: *Classify all … again* in the folder's settings goes through its documents
+  one after another and says how far it has got. A document busy with a run of its own is asked
+  again as soon as it is free.
+- **Correcting a document's language** asks again by itself, whenever that changes what the model
+  is shown: its class had been chosen from a list in the language it was thought to be in.
+- A document that was already extracted stays *Done* after it is classified again, and a failed
+  run keeps the class it had.
 
-[0.3.0](../../releases/tag/v0.3.0-beta) brought hiding a value; each release's notes are on its
-[release page](../../releases).
+Under the hood, each model run now streams its tokens on a channel of its own rather than an
+app-wide event, so a classification asked for during an extraction cannot leak its tokens into the
+extraction's live view.
+
+[0.4.0](../../releases/tag/v0.4.0-beta) brought language detection; each release's notes are on
+its [release page](../../releases).
 
 ## Links
 
@@ -94,9 +88,10 @@ npm test                          # prompt contract + redaction self-checks
 - **Reads** `pdf png jpg jpeg webp tif tiff`. PDFs render at 200 DPI; a page's text layer is used
   directly when it yields >50 chars, else OCR (PP-OCRv5 + Latin recognition, Rust/ONNX).
 - **Detects the language, then classifies.** As soon as the text is in, the page's language is read
-  off it, then one of twelve classes is asked for, in that language. There is nothing to configure
-  per run, so there is no button. The class list belongs to the project the document was opened
-  into — turn it off, or edit it, from the gear beside the project name.
+  off it, then one of twelve classes is asked for, in that language. The class list belongs to the
+  project the document was opened into — turn it off, or edit it, from the gear beside the project
+  name — and a document, or the whole folder, can be classified again from there or from the top
+  bar.
 - **You declare the fields** as `key` + `description` rows. New docs start with a 7-field preset,
   drawn from the keys that language's own training rows carry most often, in the language the page
   was detected in. Keep the schema tight, and if detection got the language wrong, set *Documents
@@ -184,7 +179,7 @@ and padded outward, so it can take a letter of the label beside it; a line with 
   - [ ] Train a dedicated PII model, so personal data is found and hidden without a schema field
     for each kind of it
 - [x] Detect the document's language instead of being told it (0.4.0)
-- [ ] Re-classify on demand, not only on open
+- [x] Re-classify on demand, not only on open (0.5.0)
 - [ ] Move documents between projects, and open a whole folder at once
 
 ## Licence

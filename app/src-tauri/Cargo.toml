@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.4.0"
+version = "0.5.0"
 description = "Offline document classification, key information extraction and redaction"
 authors = ["Andrea Gemelli"]
 license = "CC-BY-NC-SA-4.0"

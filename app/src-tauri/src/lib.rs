@@ -5,7 +5,8 @@ mod ocr;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::path::BaseDirectory;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::ipc::Channel;
+use tauri::{AppHandle, Manager};
 
 const RESOURCES: [&str; 5] = ["det.onnx", "rec.onnx", "dict.txt", "model.gguf", "lid.176.ftz"];
 
@@ -64,12 +65,21 @@ async fn ocr(app: AppHandle, png: Vec<u8>) -> Result<Vec<ocr::Line>, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Tokens go to this run's own channel, not to an app-wide event: two runs in
+/// flight — an extraction and a classification asked for meanwhile — would
+/// otherwise each hear the other's tokens. The model lock still runs them one
+/// at a time; this only keeps their words apart.
 #[tauri::command]
-async fn extract(app: AppHandle, prompt: String, sampling: llm::Sampling) -> Result<String, String> {
+async fn extract(
+    app: AppHandle,
+    prompt: String,
+    sampling: llm::Sampling,
+    on_token: Channel<String>,
+) -> Result<String, String> {
     let gguf = res(&app, "model.gguf");
     tauri::async_runtime::spawn_blocking(move || {
         llm::run(&gguf, &prompt, &sampling, |piece| {
-            let _ = app.emit("token", piece);
+            let _ = on_token.send(piece.to_owned());
         })
     })
     .await

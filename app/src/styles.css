@@ -687,6 +687,13 @@ button, input, textarea { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .tag > svg { flex: none; color: var(--ink-3); }
+/* No class yet: the tag's own place, dashed, as a button to ask for one. */
+.tag-btn { border-style: dashed; background: transparent; color: var(--ink-2); cursor: pointer; }
+.tag-btn:hover:not([aria-disabled="true"]) { background: var(--surface-2); color: var(--ink); }
+.tag-btn[aria-disabled="true"] { color: var(--ink-3); border-color: var(--line); cursor: not-allowed; }
+/* Ask again, beside the class it would change. */
+.tag-act { width: 26px; height: 26px; margin-left: -6px; }
+.sweep { gap: 6px; }
 /* The same fact in the rail, where it is one line of metadata among others and
    the card is 240px wide: the icon carries the meaning, the grey says the app
    worked this out rather than you typing it. */
@@ -756,8 +763,8 @@ button, input, textarea { font: inherit; color: inherit; }
   font-weight: 500;
   cursor: pointer;
 }
-.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--ink-3); }
-.btn:disabled { background: var(--surface-2); border-color: var(--line); color: var(--ink-3); cursor: not-allowed; }
+.btn:hover:not(:disabled, [aria-disabled="true"]) { background: var(--surface-2); border-color: var(--ink-3); }
+.btn:disabled, .btn[aria-disabled="true"] { background: var(--surface-2); border-color: var(--line); color: var(--ink-3); cursor: not-allowed; }
 .btn > svg:only-child { margin: 0 -3px; }
 .btn.primary {
   border-color: var(--accent);

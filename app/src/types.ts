@@ -91,9 +91,9 @@ export type Doc = {
   /** Decode rate of the last run, tokens per second. Absent if it never ran. */
   tps?: number;
   /**
-   * The class the model assigned on load, as the name shown in the class list.
-   * Absent when classification is off, was switched off, or the model answered
-   * with something that is not a class at all.
+   * The class the model last assigned, on open or when asked again, as the name
+   * shown in the class list. Absent when it was never asked, or its last answer
+   * was not a class on the list; a run that failed keeps the one before.
    */
   docClass?: string;
   /** The project this document was opened into. Absent on 0.2.x history. */
