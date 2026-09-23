@@ -33,6 +33,14 @@ export async function extract(
   }
 }
 
+/**
+ * The page's language, as a code and how sure of it, or null when the folder's
+ * should stand: too little text, a language outside the eight, or unsure.
+ */
+export function detectLang(text: string): Promise<[string, number] | null> {
+  return invoke("detect_lang", { text });
+}
+
 export function backendStatus(): Promise<{ ok: boolean; detail: string }> {
   return invoke("backend_status");
 }

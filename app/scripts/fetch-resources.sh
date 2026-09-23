@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fills src-tauri/resources/ with the four files the Rust backend expects.
+# Fills src-tauri/resources/ with the five files the Rust backend expects.
 # Idempotent: skips anything already present. Run once before "npm run tauri dev".
 set -euo pipefail
 
@@ -54,5 +54,19 @@ if [ ! -f "$RES/model.gguf" ]; then
     mv "$TMP/gguf/LFM2.5-350M-Extract-ML-LoRA-Q8_0.gguf" "$RES/model.gguf"
   fi
 fi
+
+# fastText's lid.176 language identifier, CC BY-SA 3.0 (see NOTICE). Pinned by
+# hash: it is fetched from a plain URL, not a versioned repository.
+LID_SHA256=8f3472cfe8738a7b6099e8e999c3cbfae0dcd15696aac7d7738a8039db603e83
+if [ ! -f "$RES/lid.176.ftz" ]; then
+  curl -fsSL -o "$TMP/lid.176.ftz" https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz
+  # $PY rather than sha256sum, which macOS does not have.
+  "$PY" -c 'import hashlib,sys; h=hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest(); sys.exit(h!=sys.argv[2] and "lid.176.ftz: unexpected sha256 "+h)' "$TMP/lid.176.ftz" "$LID_SHA256"
+  mv "$TMP/lid.176.ftz" "$RES/lid.176.ftz"
+fi
+
+# The attributions travel with the files they are owed for: resources/* is what
+# the installer bundles, and CC BY-SA asks for the licence with every copy.
+cp "$(dirname "$0")/../../NOTICE" "$RES/NOTICE"
 
 ls -lh "$RES"

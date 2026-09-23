@@ -25,7 +25,16 @@ const EN = {
   htmlLang: "en",
   docLanguage: "Documents are in",
   projectLanguageHelp:
-    "The language the documents in this folder are written in. It sets the class names below and the schema a document opened in here starts from. One document can still differ — the extraction settings override it for that document alone.",
+    "The language the documents in this folder are written in — or, while detection is on, the one to fall back on when a page's own cannot be told. It sets the class names below and the schema a document opened in here starts from. One document can still differ: the extraction settings override it for that document alone.",
+  detectLang: "Detect each document's language",
+  detectLangHelp:
+    "Reads each page as it opens and picks which of the eight languages it is in, so its schema and class names go to the model in that language. A page in none of them, or one it is unsure of, gets the folder's language. It runs on this computer, like everything else.",
+  langDetected: (name: string, pct: number) =>
+    `${name}, detected from the page (${pct}% sure). If it is wrong, change it in the extraction settings.`,
+  langChosen: (name: string) => `${name}, chosen for this document in the extraction settings.`,
+  langFolder: (name: string) => `${name}, the folder's language.`,
+  langUnsure: (name: string) =>
+    `${name}, the folder's language: the page's own is not one of the eight, or could not be told.`,
   docLanguageHelp:
     "The language THIS document is written in, overriding its folder's. Keys, descriptions and class names go into the prompt in that language, because the model was fine-tuned with the prompt and the page in the same one — an English schema on an Italian page measurably invents values. Separate from the language of this interface.",
   classHelp: "What the model decided this document is, asked for when it was opened.",
@@ -284,7 +293,16 @@ const IT: Dict = {
   htmlLang: "it",
   docLanguage: "I documenti sono in",
   projectLanguageHelp:
-    "La lingua in cui sono scritti i documenti di questa cartella. Determina i nomi delle classi qui sotto e lo schema da cui parte un documento aperto qui. Un singolo documento può comunque differire: le impostazioni di estrazione lo sovrascrivono solo per quel documento.",
+    "La lingua in cui sono scritti i documenti di questa cartella, oppure, finché il rilevamento è attivo, quella da usare quando la lingua di una pagina non si riesce a stabilire. Determina i nomi delle classi qui sotto e lo schema da cui parte un documento aperto qui. Un singolo documento può comunque differire: le impostazioni di estrazione lo sovrascrivono solo per quel documento.",
+  detectLang: "Rileva la lingua di ogni documento",
+  detectLangHelp:
+    "Legge ogni pagina appena si apre e sceglie in quale delle otto lingue è scritta, così schema e nomi delle classi arrivano al modello in quella lingua. Una pagina in nessuna di esse, o di cui non è sicuro, prende la lingua della cartella. Gira su questo computer, come tutto il resto.",
+  langDetected: (name, pct) =>
+    `Lingua rilevata dalla pagina: ${name} (certezza del ${pct}%). Se è sbagliata, cambiala nelle impostazioni di estrazione.`,
+  langChosen: (name) => `Lingua scelta per questo documento nelle impostazioni di estrazione: ${name}.`,
+  langFolder: (name) => `Lingua della cartella: ${name}.`,
+  langUnsure: (name) =>
+    `Lingua della cartella: ${name}. Quella della pagina non è fra le otto, o non si è potuta stabilire.`,
   docLanguageHelp:
     "La lingua in cui è scritto QUESTO documento, che prevale su quella della cartella. Chiavi, descrizioni e nomi delle classi entrano nel prompt in quella lingua, perché il modello è stato addestrato con prompt e pagina nella stessa: uno schema inglese su una pagina italiana inventa valori in modo misurabile. È una scelta distinta dalla lingua di questa interfaccia.",
   classHelp: "Che cosa il modello ha deciso che sia questo documento, chiesto all'apertura.",

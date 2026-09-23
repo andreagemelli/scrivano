@@ -21,7 +21,7 @@ npm install
 npm run tauri dev
 ```
 
-`fetch-resources.sh` fills `src-tauri/resources/` (gitignored) with the four files the Rust side
+`fetch-resources.sh` fills `src-tauri/resources/` (gitignored) with the five files the Rust side
 expects. It is idempotent, so re-running it is a no-op.
 
 It has to be `npm run tauri dev`. `npm run dev` starts only the Vite server, and a page opened in
@@ -55,7 +55,8 @@ cargo test --manifest-path src-tauri/Cargo.toml   # end-to-end decode + OCR, nee
 | `src/App.tsx` | Shell, document state, the extraction run and the tok/s measurement. |
 | `src/Logo.tsx` | The mark. Same geometry as `icons/scrivano.svg`; edit both together. |
 | `src-tauri/src/llm.rs` | llama.cpp decode loop and the sampler chain. |
-| `src-tauri/src/ocr.rs` | PP-OCRv5 through `oar-ocr`, boxes normalised to 0..1. |
+| `src-tauri/src/ocr.rs` | PP-OCRv5 through `oar-ocr`, boxes normalised to 0..1, one run per character from the recognizer's CTC columns. |
+| `src-tauri/src/lid.rs` | The page's language, by fastText's `lid.176` through the pure-Rust `fasttext-pure-rs`, narrowed to the eight and to answers it is at least even sure of. |
 | `scripts/ui-shots.mjs` | Screenshots of every UI state in WebKit, by faking `window.__TAURI_INTERNALS__`. Needs `npm i -D --no-save playwright`; not part of `npm test`. |
 
 The UI is English or Italian. Field descriptions and class names are written in the document's
@@ -86,5 +87,6 @@ Fetched by the script, not committed:
 | `rec.onnx` | 7.7 MiB | Latin text recognition |
 | `dict.txt` | 2.6 KiB | recognition character set |
 | `model.gguf` | 362 MiB | the extraction model, Q8_0 |
+| `lid.176.ftz` | 917 KiB | fastText language identification, pinned by sha256 |
 
 The GGUF dominates the installer. Expect a bundle around 420 MB.

@@ -1,13 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Gear, Play, Tag as TagIcon, WarningCircle, X } from "@phosphor-icons/react";
+import { ArrowRight, Gear, Play, Tag as TagIcon, Translate, WarningCircle, X } from "@phosphor-icons/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { backendStatus, extract, inTauri } from "./api";
+import { backendStatus, detectLang, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
 import { DEFAULT_PREFS, FIRST_PROJECT, loadDocs, loadPrefs, saveDocs, savePrefs } from "./store";
 import { buildPrompt, parseAnswer, parseClass } from "./prompt";
 import { hiddenValues, locate } from "./redact";
-import { classAlias, classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
+import {
+  DOC_LANGS,
+  classAlias,
+  classesFor,
+  classesShown,
+  defaultClasses,
+  defaultFields,
+  eyeOf,
+  presetFor,
+  samePreset,
+  schemaFor,
+  withEyes,
+} from "./catalog";
+import { DOC_LANGUAGE_NAME } from "./LangPicker";
 import { DICTS, Words } from "./i18n";
 import Hints from "./Hints";
 import Logo from "./Logo";
@@ -92,6 +105,13 @@ export default function App() {
   /** The draft's language: what the next document in this folder starts from. */
   const [draftLang, setDraftLang] = useState<DocLang>(DEFAULT_PREFS.projects[0].docLang);
   const [draftSampling, setDraftSampling] = useState<Sampling>(DEFAULT_SAMPLING);
+  // The eye, remembered for the session by what the key means (`eyeOf`), not
+  // by the key: a schema is swapped for another language's preset often — on
+  // detection, on a folder or language change — and the eye has to survive the
+  // swap, or a batch quietly stops being hidden halfway through.
+  const [shut, setShut] = useState<Record<string, boolean>>({});
+  const shutRef = useRef(shut);
+  shutRef.current = shut;
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState("");
   const [hushed, setHushed] = useState(false);
@@ -100,6 +120,10 @@ export default function App() {
   // The text the JSON pane is pointing at, or null. Read by the document pane.
   const [highlight, setHighlight] = useState<string | null>(null);
   const disk = useRef<Doc[]>(INITIAL);
+  // The documents as last rendered, for an async step that must see edits made
+  // while it waited — a schema changed while its file was still being read.
+  const docsNow = useRef<Doc[]>(INITIAL);
+  docsNow.current = docs;
   const gearRef = useRef<HTMLButtonElement>(null);
 
   const t = DICTS[lang];
@@ -134,14 +158,10 @@ export default function App() {
   // made its schema the template for every file dropped afterwards — and since a
   // document saved by 0.1.x carries the 0.1.x vocabulary, one such document in
   // the history was enough for the old keys to propagate forever.
-  const newDocDefaults = useRef({ fields: draft, sampling: draftSampling });
-  newDocDefaults.current = { fields: draft, sampling: draftSampling };
-  const classifier = useRef<{ project: Project | undefined; docLang: DocLang; projectId: string }>({
-    project: projects[0],
-    docLang,
-    projectId,
-  });
-  classifier.current = { project: projects.find((p) => p.id === projectId), docLang, projectId };
+  const newDocDefaults = useRef({ fields: draft, lang: draftLang, sampling: draftSampling });
+  newDocDefaults.current = { fields: draft, lang: draftLang, sampling: draftSampling };
+  const opening = useRef<{ project: Project; projectId: string }>({ project, projectId });
+  opening.current = { project, projectId: project.id };
   // Same reason: the drop handler needs the current words, not the ones that
   // were on screen when it was registered.
   const words = useRef(t);
@@ -169,7 +189,7 @@ export default function App() {
       // stored folder's preset rather than staying a mix.
       if (home.docLang !== DEFAULT_PREFS.projects[0].docLang) {
         setDraft((cur) =>
-          sameKeys(cur, defaultFields(DEFAULT_PREFS.projects[0].docLang))
+          samePreset(cur, defaultFields(DEFAULT_PREFS.projects[0].docLang))
             ? defaultFields(home.docLang)
             : cur,
         );
@@ -216,7 +236,7 @@ export default function App() {
    * an untouched schema follows it: an edited one is work someone did.
    */
   function changeDocLang(next: DocLang) {
-    if (sameKeys(fields, defaultFields(docLang))) setFields(defaultFields(next));
+    if (samePreset(fields, defaultFields(docLang))) setFields(presetFor(next, fields, docLang, shut));
     if (doc) patch(doc.id, { docLang: next });
     // The draft language follows either way, because setFields writes the draft
     // either way: letting them disagree meant the next folder you opened saw a
@@ -233,14 +253,14 @@ export default function App() {
     const was = projects.find((p) => p.id === next.id);
     const moved = was !== undefined && was.docLang !== next.docLang;
     const settled =
-      moved && sameKeys(next.classes, defaultClasses(was.docLang))
+      moved && samePreset(next.classes, defaultClasses(was.docLang))
         ? { ...next, classes: defaultClasses(next.docLang) }
         : next;
     const nextProjects = projects.map((p) => (p.id === settled.id ? settled : p));
     setProjects(nextProjects);
     void savePrefs({ ...prefs, projects: nextProjects });
     if (moved && settled.id === projectId) {
-      if (sameKeys(draft, defaultFields(was.docLang))) setDraft(defaultFields(settled.docLang));
+      if (samePreset(draft, defaultFields(was.docLang))) setDraft(presetFor(settled.docLang, draft, was.docLang, shut));
       setDraftLang(settled.docLang);
     }
   }
@@ -252,7 +272,7 @@ export default function App() {
     setActiveId(null);
     // A folder you switch into brings its own language, and with it the schema
     // the next document starts from — as long as nobody has edited the draft.
-    if (sameKeys(draft, defaultFields(draftLang))) setDraft(defaultFields(next.docLang));
+    if (samePreset(draft, defaultFields(draftLang))) setDraft(presetFor(next.docLang, draft, draftLang, shut));
     setDraftLang(next.docLang);
     void savePrefs({ ...prefs, activeProjectId: id });
   }
@@ -264,6 +284,7 @@ export default function App() {
       id: crypto.randomUUID(),
       name,
       docLang: project.docLang,
+      detectLang: true,
       classify: true,
       classes: defaultClasses(project.docLang),
     };
@@ -313,15 +334,19 @@ export default function App() {
 
   async function addPath(path: string) {
     const id = crypto.randomUUID();
+    // The folder it opens into, fixed now: switching folders while it reads
+    // must not change which folder's rules it is classified by.
+    const { project: home } = opening.current;
+    const draft = newDocDefaults.current;
     setDocs((ds) => [
       {
         id,
         name: path.split(/[\\/]/).pop() ?? path,
         addedAt: Date.now(),
         pages: [],
-        fields: newDocDefaults.current.fields,
-        sampling: newDocDefaults.current.sampling,
-        projectId: classifier.current.projectId,
+        fields: withEyes(draft.fields, draft.lang, shutRef.current),
+        sampling: draft.sampling,
+        projectId: home.id,
         status: "reading",
       },
       ...ds,
@@ -337,7 +362,41 @@ export default function App() {
     } finally {
       setProgress("");
     }
-    await classifyDoc(id, pages);
+    // The page says what language it is in, and that decides the language of
+    // everything the model is shown for it. Read against the document as it is
+    // now, not as it was when the file was dropped: a language or a schema set
+    // by hand while it was reading wins over the page.
+    // The OCR recognises Latin script only. A Chinese or Japanese scan comes out
+    // as its emails, codes and company names, which read as French or English:
+    // evidence of nothing, so in such a folder an OCR'd page does not overrule it.
+    const blind = (home.docLang === "zh" || home.docLang === "ja") && pages.some((p) => !p.fromTextLayer);
+    const detected = home.detectLang && !blind ? await detectPage(pages) : undefined;
+    const now = docsNow.current.find((d) => d.id === id);
+    if (!now) return; // deleted while it was reading
+    const lang = now.docLang ?? detected?.lang ?? draft.lang;
+    // An untouched preset follows; an edited schema is somebody's work.
+    const swap = lang !== draft.lang && samePreset(now.fields, defaultFields(draft.lang));
+    patch(id, {
+      pages,
+      detected,
+      // Recorded when it is not simply the folder's, so the tag can say why.
+      ...(lang !== home.docLang || detected ? { docLang: lang } : {}),
+      ...(swap && { fields: presetFor(lang, now.fields, draft.lang, shutRef.current) }),
+    });
+    await classifyDoc(id, pages, home, lang);
+  }
+
+  /** What language the pages are in, or null when the folder's should stand. */
+  async function detectPage(pages: Page[]): Promise<Doc["detected"]> {
+    if (!inTauri) return null;
+    try {
+      const got = await detectLang(pages.flatMap((p) => p.lines.map((l) => l.text)).join("\n"));
+      return got && (DOC_LANGS as string[]).includes(got[0]) ? { lang: got[0] as DocLang, p: got[1] } : null;
+    } catch (e) {
+      // Detection is a convenience: without it the folder's language stands.
+      console.error("language detection failed", e);
+      return null;
+    }
   }
 
   /**
@@ -348,18 +407,19 @@ export default function App() {
    * failure here is not the document's failure: it still opens, and it still
    * extracts. It just opens without a class.
    */
-  async function classifyDoc(id: string, pages: Page[]) {
-    const { project, docLang } = classifier.current;
-    const classes = project?.classes ?? [];
+  async function classifyDoc(id: string, pages: Page[], project: Project, docLang: DocLang) {
     const lines = pages.flatMap((p) => p.lines.map((l) => l.text));
-    if (!project?.classify || classes.length === 0 || lines.length === 0 || !inTauri) {
-      patch(id, { pages, status: "ready" });
+    if (!project.classify || project.classes.length === 0 || lines.length === 0 || !inTauri) {
+      patch(id, { status: "ready" });
       return;
     }
-    patch(id, { pages, status: "classifying" });
+    patch(id, { status: "classifying" });
     try {
-      const raw = await extract(buildPrompt("classify", classes, lines), CLASSIFY_SAMPLING, noop);
-      const picked = parseClass(raw, classes, classAlias(docLang));
+      const shown = classesShown(project.classes, project.docLang, docLang);
+      const raw = await extract(buildPrompt("classify", shown, lines), CLASSIFY_SAMPLING, noop);
+      // Read against the folder's own list: the alias table files a class named
+      // in the page's language under the folder's name for it.
+      const picked = parseClass(raw, project.classes, classAlias(project.docLang));
       // An answer nobody can place is worth saying out loud: a silently dropped
       // one is indistinguishable from classification being switched off, which
       // is exactly how a 100% failure rate went unnoticed.
@@ -436,7 +496,21 @@ export default function App() {
    */
   function setFields(next: Field[]) {
     setDraft(next);
-    if (doc) patch(doc.id, { fields: next });
+    if (doc) {
+      patch(doc.id, { fields: next });
+      // The draft now holds this document's keys, so it is in this document's
+      // language: letting the two disagree made the next page skip its swap.
+      setDraftLang(docLang);
+    }
+    // An eye opened or closed in the schema drawer is remembered like one
+    // toggled on a result.
+    const eyes = next.filter((f) => {
+      const was = fields.find((o) => o.key === f.key);
+      return was !== undefined && !was.hidden !== !f.hidden;
+    });
+    if (eyes.length > 0) {
+      setShut((m) => ({ ...m, ...Object.fromEntries(eyes.map((f) => [eyeOf(docLang, f.key), !!f.hidden])) }));
+    }
   }
 
   /**
@@ -446,9 +520,12 @@ export default function App() {
    */
   function toggleHidden(key: string) {
     const hidden = !fields.find((f) => f.key === key)?.hidden;
-    const flip = (fs: Field[]) => fs.map((f) => (f.key === key ? { ...f, hidden } : f));
-    setDraft(flip);
-    if (doc) patch(doc.id, { fields: flip(doc.fields) });
+    const eye = eyeOf(docLang, key);
+    setShut((m) => ({ ...m, [eye]: hidden }));
+    // By meaning, so it lands on the draft's key for the same thing even when
+    // the draft is in another language.
+    setDraft((d) => withEyes(d, draftLang, { [eye]: hidden }));
+    if (doc) patch(doc.id, { fields: withEyes(doc.fields, docLang, { [eye]: hidden }) });
   }
 
   function setSampling(next: Sampling) {
@@ -528,6 +605,14 @@ export default function App() {
             <span className="tag class-tag" data-hint={t.classHelp}>
               <TagIcon size={12} weight="regular" />
               {doc.docClass}
+            </span>
+          )}
+          {/* The language everything the model sees is written in, and where
+              that came from: the page itself, a choice, or the folder. */}
+          {doc && doc.pages.length > 0 && (
+            <span className="tag" data-hint={langHint(t, doc, docLang)}>
+              <Translate size={12} weight="regular" />
+              {docLang.toUpperCase()}
             </span>
           )}
           <span className={`pill status-${status}`}>
@@ -668,6 +753,16 @@ export default function App() {
   );
 }
 
+/** Where the document's language came from, in words. */
+function langHint(t: Dict, doc: Doc, lang: DocLang): string {
+  const name = DOC_LANGUAGE_NAME[lang];
+  if (doc.docLang && doc.detected?.lang === doc.docLang) {
+    return t.langDetected(name, Math.round(doc.detected.p * 100));
+  }
+  if (doc.docLang) return t.langChosen(name);
+  return doc.detected === null ? t.langUnsure(name) : t.langFolder(name);
+}
+
 /** Where a document lives. History written before projects existed is in the first. */
 function projectOf(d: Doc): string {
   return d.projectId ?? FIRST_PROJECT;
@@ -690,13 +785,4 @@ function merge(cur: Doc[], stored: Doc[]): Doc[] {
   const seen = new Set(cur.map((d) => d.id));
   const add = stored.filter((d) => !seen.has(d.id));
   return add.length === 0 ? cur : [...cur, ...add];
-}
-
-/**
- * Two schemas naming the same keys in the same order: nobody has edited this
- * one. A closed eye is an edit too — swapping such a schema for a fresh preset
- * would quietly open it again.
- */
-function sameKeys(a: Field[], b: Field[]): boolean {
-  return a.length === b.length && a.every((f, i) => f.key === b[i].key && !f.hidden);
 }

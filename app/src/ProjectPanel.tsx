@@ -123,6 +123,16 @@ export default function ProjectPanel({
               hint={t.projectLanguageHelp}
               onLang={(docLang) => onChange({ ...project, docLang })}
             />
+            {/* On by default: the folder's language becomes the fallback for a
+                page detection cannot place, rather than a rule for every page. */}
+            <label className="toggle" data-hint={t.detectLangHelp}>
+              <input
+                type="checkbox"
+                checked={project.detectLang}
+                onChange={(e) => onChange({ ...project, detectLang: e.target.checked })}
+              />
+              {t.detectLang}
+            </label>
             <p className="setting-help">{t.projectHelp(count)}</p>
           </section>
 

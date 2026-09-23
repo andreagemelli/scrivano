@@ -12,7 +12,7 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 > **The project born as a toy excercise for finetuning and extending LFM-2.5-350M for italian and KIE. I am now having fun adding new capabilities!**
 
-![beta](https://img.shields.io/badge/release-0.3.0--beta-1d4ed8)
+![beta](https://img.shields.io/badge/release-0.4.0--beta-1d4ed8)
 ![macOS](https://img.shields.io/badge/macOS-supported-informational)
 ![Windows](https://img.shields.io/badge/Windows-supported-informational)
 ![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-lightgrey)
@@ -21,26 +21,35 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 ![Scrivano: a residence declaration classified and extracted, with the folder it was filed in](docs/screenshot-app.png)
 
-## What is new in 0.3.0
+## What is new in 0.4.0
 
-**Hide a value before you hand the document on.** Every extracted field has an eye. Close it and
-the value leaves the app as `[REDACTED]` — in the JSON you copy or download, in the document's
-text, and on the page itself, painted over in black. The point is a document you can give to
-another agent without giving it the name, the tax code or the address on it.
+**The page says what language it is in.** Until now a folder said it, and a German page in a folder
+of Italian ones got an Italian schema unless someone remembered to change it — which matters,
+because keys, descriptions and class names go into the prompt in the document's language, and an
+English schema over an Italian page measurably invents values.
 
-- **The PDF is rebuilt from pixels.** *Download as PDF* renders every page with the hidden values
-  painted into the image and writes nothing else: no text layer, nothing of the source file. There
-  is nothing under the black box to select and copy back out.
-- **Copy the text** hands over the page text with the same values replaced, ready to paste.
-- **The eye belongs to the field, not to one document**, so the next document inherits it: hide
-  `codice-fiscale` once and a whole batch comes out without one.
-- **It hides what the model extracted**, wherever that text occurs on the page and every time it
-  does. A hidden value the page does not contain — misread by the OCR, or invented by the model —
-  is flagged *not blacked out* rather than silently left showing. What the page view shows is
-  exactly what the PDF will carry, so look at it before you share.
+- **Detected on open**, with fastText's `lid.176` (176 languages, under a megabyte, offline like
+  everything else), narrowed to the model's eight. On the 458 validation pages of
+  `xfund-docai-xl` it names the right language for 450, leaves three sparse memos to the folder's,
+  and calls five English — English form templates filled in with German, Spanish and Portuguese
+  values.
+- **The folder's language becomes the fallback**: for a page in none of the eight, one with too
+  few letters to tell, or one detection is less than even sure of. It can be switched off per
+  folder, and one document's language can still be changed by hand in the extraction settings.
+- **What can follow it, does.** An untouched preset becomes that language's preset. While the
+  folder's class list is still the trained twelve, the model is shown it in the page's language,
+  and the answer is filed under the folder's own name for the class, so a folder of mixed pages
+  still groups under one set of tags. An edited schema or class list is somebody's work and goes
+  as written.
+- The document's language sits in the top bar, and says where it came from: the page, a choice,
+  or the folder.
+- The eye from 0.3.0 is now remembered by what a field means, not by its key, so an eye closed on
+  `cognome` is closed on `nachname`. One with no counterpart in the new language comes along as its
+  own row, still closed, and a full name closes with either of its parts: swapping a schema for
+  another language's preset never opens an eye by the way.
 
-[0.2.0](../../releases/tag/v0.2.0-beta) brought the multilingual model, classification and
-projects; each release's notes are on its [release page](../../releases).
+[0.3.0](../../releases/tag/v0.3.0-beta) brought hiding a value; each release's notes are on its
+[release page](../../releases).
 
 ## Links
 
@@ -84,14 +93,16 @@ npm test                          # prompt contract + redaction self-checks
 
 - **Reads** `pdf png jpg jpeg webp tif tiff`. PDFs render at 200 DPI; a page's text layer is used
   directly when it yields >50 chars, else OCR (PP-OCRv5 + Latin recognition, Rust/ONNX).
-- **Classifies on open.** One of twelve classes, asked for as soon as the text is in. There is
-  nothing to configure per run, so there is no button. The class list belongs to the project the
-  document was opened into — turn it off, or edit it, from the gear beside the project name.
+- **Detects the language, then classifies.** As soon as the text is in, the page's language is read
+  off it, then one of twelve classes is asked for, in that language. There is nothing to configure
+  per run, so there is no button. The class list belongs to the project the document was opened
+  into — turn it off, or edit it, from the gear beside the project name.
 - **You declare the fields** as `key` + `description` rows. New docs start with a 7-field preset,
-  drawn from the keys that language's own training rows carry most often. Keep the schema tight,
-  and set *Documents are in* to the language of the page. It is not a cosmetic setting: on an
-  Italian page an English schema invented an email address that was not on it and read the
-  postcode as a phone number, while the Italian schema returned every field correctly.
+  drawn from the keys that language's own training rows carry most often, in the language the page
+  was detected in. Keep the schema tight, and if detection got the language wrong, set *Documents
+  are in* by hand. It is not a cosmetic setting: on an Italian page an English schema invented an
+  email address that was not on it and read the postcode as a phone number, while the Italian
+  schema returned every field correctly.
 - **Streams the JSON**, points values back at the page on hover, and flags values that appear
   nowhere on the page as likely inventions.
 - **Hides what you tell it to.** A field's eye replaces its value with `[REDACTED]` in the JSON
@@ -103,7 +114,8 @@ npm test                          # prompt contract + redaction self-checks
 - **Two languages, two different questions.** The interface speaks English or Italian. The
   documents can be in any of the model's eight, and that is the one that matters: keys,
   descriptions and class names go into the prompt in the document's language, because that is how
-  the model was trained.
+  the model was trained. Each page's language is detected as it opens (fastText `lid.176`); the
+  folder's is the fallback.
 - Decoding (temperature, top-k/p, max tokens, seed) is configurable; temperature 0 by default.
 
 The published F1 assumes the model is told which fields the document contains — *you* supply that
@@ -171,7 +183,7 @@ and padded outward, so it can take a letter of the label beside it; a line with 
 - [x] Add PII pipeline — hide an extracted value in the JSON, the text and the PDF (0.3.0)
   - [ ] Train a dedicated PII model, so personal data is found and hidden without a schema field
     for each kind of it
-- [ ] Detect the document's language instead of being told it
+- [x] Detect the document's language instead of being told it (0.4.0)
 - [ ] Re-classify on demand, not only on open
 - [ ] Move documents between projects, and open a whole folder at once
 

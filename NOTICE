@@ -53,6 +53,21 @@ PP-OCRv5 mobile Latin recognition (resources/rec.onnx, resources/dict.txt)
   Copyright (c) PaddlePaddle Authors. Apache License 2.0.
   dict.txt is extracted verbatim from that repository's inference.yml.
 
+fastText language identification (resources/lid.176.ftz, 917 KB)
+  https://fasttext.cc/docs/en/language-identification.html
+  https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz
+  sha256 8f3472cfe8738a7b6099e8e999c3cbfae0dcd15696aac7d7738a8039db603e83
+  By Facebook AI Research (fastText). Shipped unmodified.
+  Creative Commons Attribution-ShareAlike 3.0 Unported,
+  https://creativecommons.org/licenses/by-sa/3.0/
+  Trained on Wikipedia, Tatoeba and SETimes (CC BY-SA). The file keeps its
+  own licence, not Scrivano's; ShareAlike binds adaptations of it, and it is
+  not adapted. This NOTICE ships next to it inside the installer.
+  A. Joulin, E. Grave, P. Bojanowski, T. Mikolov, "Bag of Tricks for Efficient
+  Text Classification", arXiv:1607.01759; A. Joulin, E. Grave, P. Bojanowski,
+  M. Douze, H. Jegou, T. Mikolov, "FastText.zip: Compressing text
+  classification models", arXiv:1612.03651.
+
 
 RUST DEPENDENCIES LINKED INTO THE BINARY
 ========================================
@@ -66,6 +81,7 @@ ort 2.0.0-rc.13 (ONNX Runtime)     MIT OR Apache-2.0
 tauri 2.11.5 and plugins           MIT OR Apache-2.0
 image 0.25.10                      MIT OR Apache-2.0
 encoding_rs 0.8.35                 (MIT OR Apache-2.0) AND BSD-3-Clause
+fasttext-pure-rs 0.1.0             MIT, Copyright (c) 2026 Jeremy Thomerson
 anyhow, serde, serde_json          MIT OR Apache-2.0
 
 The full dependency tree with resolved versions is app/src-tauri/Cargo.lock.

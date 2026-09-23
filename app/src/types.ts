@@ -99,11 +99,18 @@ export type Doc = {
   /** The project this document was opened into. Absent on 0.2.x history. */
   projectId?: string;
   /**
-   * This one document's language, when it is not its folder's. A German page in
-   * a folder of Italian ones is a real thing and it needs a German schema: the
-   * project's language is a default, not a rule.
+   * This one document's language, when it is not simply its folder's: detected
+   * from the page when it opened, or chosen in the extraction settings. A German
+   * page in a folder of Italian ones is a real thing and it needs a German
+   * schema: the project's language is a default, not a rule.
    */
   docLang?: DocLang;
+  /**
+   * What detection made of the page when it opened, so the language shown can
+   * say where it came from. null: detection ran and could not tell, so the
+   * folder's stands. Absent: detection was off, or the document predates it.
+   */
+  detected?: { lang: DocLang; p: number } | null;
 };
 
 /**
@@ -119,12 +126,18 @@ export type Project = {
   /** Empty means the first project, which is named by the interface language. */
   name: string;
   /**
-   * The language the documents in here are written in. It decides two things:
-   * which class names the model is shown, and which schema a new document in
-   * this folder starts from. Both have to be in the document's own language, so
-   * this is the one setting a folder cannot do without.
+   * The language the documents in here are written in — the fallback, while
+   * detection is on, for a page whose own cannot be told. It is what a document
+   * starts from then: the class names the model is shown and the preset schema.
+   * The folder's class list is written in it, and every answer is filed under
+   * it, whatever language the page turned out to be in.
    */
   docLang: DocLang;
+  /**
+   * Detect each document's language as it opens. The folder's language is then
+   * the fallback, for a page in none of the eight or one detection is unsure of.
+   */
+  detectLang: boolean;
   /** Ask the model for a class as soon as a document is opened in here. */
   classify: boolean;
   /** The classes it may pick from. Editable per project, so it is stored. */

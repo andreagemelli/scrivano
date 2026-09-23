@@ -20,7 +20,14 @@ export const FIRST_PROJECT = "inbox";
 export const DEFAULT_PREFS: Prefs = {
   lang: "en",
   projects: [
-    { id: FIRST_PROJECT, name: "", docLang: "en", classify: true, classes: defaultClasses("en") },
+    {
+      id: FIRST_PROJECT,
+      name: "",
+      docLang: "en",
+      detectLang: true,
+      classify: true,
+      classes: defaultClasses("en"),
+    },
   ],
   activeProjectId: FIRST_PROJECT,
 };
@@ -93,6 +100,7 @@ export async function loadPrefs(): Promise<Prefs> {
           id: FIRST_PROJECT,
           name: "",
           docLang: wasLang,
+          detectLang: true,
           classify: old?.classify ?? true,
           classes:
             Array.isArray(old?.classes) && old.classes.length > 0
@@ -104,6 +112,8 @@ export async function loadPrefs(): Promise<Prefs> {
     // A store hand-edited into nonsense must not leave the app unusable.
     for (const project of prefs.projects) {
       if (!project.docLang) project.docLang = wasLang;
+      // Folders from before detection get it on: it is what the setting is for.
+      if (typeof project.detectLang !== "boolean") project.detectLang = true;
       if (!Array.isArray(project.classes)) project.classes = defaultClasses(project.docLang);
     }
     if (!prefs.projects.some((x) => x.id === prefs.activeProjectId)) {
