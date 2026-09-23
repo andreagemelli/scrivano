@@ -501,10 +501,12 @@ button, input, textarea { font: inherit; color: inherit; }
   flex: none;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--line);
 }
-.rail.collapsed .rail-foot { padding: 8px 0; }
+.rail.collapsed .rail-foot { flex-direction: column; gap: 6px; padding: 8px 0; }
 /* Round, centred and pinned to the floor in both rail states. Tinted rather
    than filled: the filled accent belongs to Extract, the primary action. */
 .fab {
@@ -559,6 +561,13 @@ button, input, textarea { font: inherit; color: inherit; }
    hovering does not exist on a touch screen. */
 .doc-del { flex: none; margin-right: 4px; opacity: 0.55; }
 .doc-card:hover .doc-del, .doc-del:focus-visible { opacity: 1; }
+/* Moving sits beside deleting, at the same half strength and for the same reason. */
+.doc-card .menu > .icon-btn { opacity: 0.55; }
+.doc-card:hover .menu > .icon-btn, .doc-card .menu > .icon-btn:focus-visible,
+.doc-card .menu > .icon-btn[aria-expanded="true"] { opacity: 1; }
+/* Kept inside the 240px rail: a long project name ellipsizes rather than
+   pushing the list off the rail's left edge. */
+.doc-card .menu .popover { max-width: 190px; }
 
 .doc-mini {
   position: relative;
@@ -859,6 +868,7 @@ button, input, textarea { font: inherit; color: inherit; }
   text-align: center;
 }
 .drop-zone .lead { max-width: 30ch; margin: 0; font-size: var(--t-title); color: var(--ink-2); }
+.drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .drop-zone .note { margin: 0; font-size: var(--t-meta); color: var(--ink-3); }
 .doc-pane.dragging .drop-zone { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
 

@@ -3,6 +3,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  Folders,
   Funnel,
   Gear,
   Plus,
@@ -108,6 +109,8 @@ export default function Sidebar({
   onToggle,
   onSelect,
   onAdd,
+  onAddFolder,
+  onMove,
   onDelete,
 }: {
   /** Only this project's documents. The rail never shows another folder's. */
@@ -125,6 +128,10 @@ export default function Sidebar({
   onToggle: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  /** Every document in a folder on disk, at once. */
+  onAddFolder: () => void;
+  /** A document into another project. */
+  onMove: (id: string, projectId: string) => void;
   onDelete: (id: string) => void;
 }) {
   const t = useT();
@@ -257,6 +264,26 @@ export default function Sidebar({
                   {state(t, item) !== "" && ` · ${state(t, item)}`} &middot; {summary(t, item)}
                 </span>
               </button>
+              {/* A menu, not a drag onto the folder: with the webview taking file
+                  drops, an in-page drag reaches neither WebKit nor WebView2.
+                  Not while it is working — a document moved mid-run would be
+                  classified by the folder it left — and it says so. */}
+              {projects.length > 1 && (
+                <Menu
+                  disabled={busy(item) ? t.moveWhenDone : undefined}
+                  value={project.id}
+                  choices={projects.map((p) => ({
+                    value: p.id,
+                    label: p.name.trim() === "" ? t.firstProject : p.name,
+                    note: p.docLang.toUpperCase(),
+                  }))}
+                  label={t.moveTo(item.name)}
+                  hint={t.moveTo(item.name)}
+                  icon={<Folders size={15} weight="regular" />}
+                  align="right"
+                  onChange={(to) => to !== project.id && onMove(item.id, to)}
+                />
+              )}
               <button
                 className="icon-btn doc-del"
                 aria-label={t.deleteDocument(item.name)}
@@ -291,6 +318,9 @@ export default function Sidebar({
       <div className="rail-foot">
         <button className="fab" aria-label={t.addDocument} data-hint={t.addDocument} onClick={onAdd}>
           <Plus size={20} weight="bold" />
+        </button>
+        <button className="icon-btn" aria-label={t.openFolder} data-hint={t.openFolderHelp} onClick={onAddFolder}>
+          <FolderOpen size={18} weight="regular" />
         </button>
       </div>
     </aside>

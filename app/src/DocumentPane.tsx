@@ -88,6 +88,7 @@ export default function DocumentPane({
   notFound,
   unsettled,
   onAdd,
+  onAddFolder,
 }: {
   doc: Doc | null;
   progress: string;
@@ -104,6 +105,7 @@ export default function DocumentPane({
   /** A field is hidden but there is no extraction to take its value from. */
   unsettled: boolean;
   onAdd: () => void;
+  onAddFolder: () => void;
 }) {
   const t = useT();
   const [tab, setTab] = useState<"page" | "text">("page");
@@ -300,9 +302,14 @@ export default function DocumentPane({
             <p className="lead">
               {dragging ? t.dropToOpen : t.dropHere}
             </p>
-            <button className="btn primary" onClick={onAdd}>
-              {t.chooseFile}
-            </button>
+            <div className="drop-actions">
+              <button className="btn primary" onClick={onAdd}>
+                {t.chooseFile}
+              </button>
+              <button className="btn" data-hint={t.openFolderHelp} onClick={onAddFolder}>
+                {t.chooseFolder}
+              </button>
+            </div>
             <p className="note">{t.formats}</p>
             {dropError !== "" && <p className="note err-text">{dropError}</p>}
           </div>

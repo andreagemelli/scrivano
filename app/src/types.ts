@@ -100,7 +100,8 @@ export type Doc = {
   projectId?: string;
   /**
    * This one document's language, when it is not simply its folder's: detected
-   * from the page when it opened, or chosen in the extraction settings. A German
+   * from the page when it opened, chosen in the extraction settings, or kept
+   * from the folder it was moved out of. A German
    * page in a folder of Italian ones is a real thing and it needs a German
    * schema: the project's language is a default, not a rule.
    */

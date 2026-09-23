@@ -254,10 +254,20 @@ function installBackend({ fixtures, seed, detect = ["it", 0.98] }) {
       case "backend_status":
         return { ok: true, detail: "models in /Applications/Scrivano.app" };
       case "plugin:dialog|open": {
+        // A folder: the fixtures live in one, with the kind of noise a real
+        // folder has around its documents (see read_dir).
+        if (args.options?.directory) return "/Users/you/Documents";
         const f = fixtures[nextPick % fixtures.length];
         nextPick++;
-        return f.path;
+        return args.options?.multiple ? [f.path] : f.path;
       }
+      case "plugin:fs|read_dir":
+        return [
+          ...fixtures.map((f) => ({ name: f.path.split("/").pop(), isFile: true, isDirectory: false, isSymlink: false })),
+          { name: ".DS_Store", isFile: true, isDirectory: false, isSymlink: false },
+          { name: "notes.txt", isFile: true, isDirectory: false, isSymlink: false },
+          { name: "old", isFile: false, isDirectory: true, isSymlink: false },
+        ];
       case "plugin:fs|read_file": {
         const f = fixtures.find((x) => args.path.endsWith(x.path.split("/").pop()));
         lastRead = f;
@@ -316,6 +326,7 @@ function installBackend({ fixtures, seed, detect = ["it", 0.98] }) {
     callbacks,
     metadata: { currentWindow: { label: "main" }, currentWebview: { windowLabel: "main", label: "main" } },
     convertFileSrc: (p) => p,
+    plugins: { path: { sep: "/", delimiter: ":" } },
   };
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: (_e, id) => callbacks.delete(id) };
 }
@@ -404,7 +415,7 @@ async function checkDetected(page) {
 
 async function openDoc(page, n = 1) {
   for (let i = 0; i < n; i++) {
-    await page.getByRole("button", { name: /Choose a file|Scegli un file|Add a document|Aggiungi un documento/ }).first().click();
+    await page.getByRole("button", { name: /Choose files|Scegli i file|Add documents|Aggiungi documenti/ }).first().click();
     await page.waitForTimeout(700);
   }
 }
@@ -514,6 +525,56 @@ async function checkEyesAcrossLanguages(browser, url) {
   }
   await shot(page, "21-eye-across-languages");
   console.log(`  eyes check: "name" closed in English arrived as ${hidden.join(", ")}`);
+  await ctx.close();
+}
+
+/**
+ * A folder opened at once: every document directly in it, in name order, the
+ * first one shown — and nothing else in it. Then one of them moved to another
+ * project, which takes it out of this folder's list and into that one's.
+ */
+async function checkFolderAndMove(browser, url) {
+  const ctx = await browser.newContext({ viewport: WIDE, colorScheme: "light", deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  page.on("pageerror", (e) => console.error("  [folder] page error:", e.message));
+  await page.addInitScript(installBackend, { fixtures: FIXTURES });
+  await page.goto(url);
+  await page.waitForSelector(".app");
+  await page.getByRole("button", { name: /^Choose a folder$/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll(".doc-card").length === 3, null, { timeout: 15000 });
+  await page.waitForFunction(() => !document.querySelector(".dot.busy"), null, { timeout: 15000 });
+  // Name order in the rail too, the one on screen at the top — and only the
+  // documents: the .DS_Store, the .txt and the subfolder beside them stay out.
+  const names = await page.locator(".doc-card .doc-name").allTextContents();
+  const want = ["delega-ritiro.png", "dichiarazione-residenza.png", "fattura-2411.png"];
+  if (JSON.stringify(names) !== JSON.stringify(want)) {
+    throw new Error(`a folder opened ${names}, expected exactly ${want} in that order`);
+  }
+  const shown = (await page.locator(".topbar-doc").textContent())?.trim();
+  if (shown !== "delega-ritiro.png") throw new Error(`the first in name order should be shown, got ${shown}`);
+  await shot(page, "24-folder-opened");
+
+  // A second project, then move one of the documents into it through its menu.
+  await page.locator(".folder-new").click();
+  await page.waitForTimeout(250);
+  await page.locator(".drawer-close").click();
+  await page.locator(".folder", { hasText: /Documents/ }).locator(".folder-main").click();
+  await page.waitForTimeout(200);
+  const card = page.locator(".doc-card", { hasText: "fattura-2411.png" });
+  await card.hover();
+  await card.locator(".menu > .icon-btn").click();
+  await page.waitForTimeout(150);
+  await shot(page, "25-move-menu");
+  await card.locator(".popover button", { hasText: /Untitled project/ }).click();
+  await page.waitForTimeout(250);
+  const left = await page.locator(".doc-card .doc-name").allTextContents();
+  if (left.includes("fattura-2411.png")) throw new Error("the moved document is still listed in its old project");
+  await page.locator(".folder", { hasText: /Untitled project/ }).locator(".folder-main").click();
+  await page.waitForTimeout(250);
+  const there = await page.locator(".doc-card .doc-name").allTextContents();
+  if (JSON.stringify(there) !== JSON.stringify(["fattura-2411.png"])) throw new Error(`the new project lists ${there}`);
+  await shot(page, "26-moved");
+  console.log(`  folder check: opened ${names.length} in name order; one moved to another project`);
   await ctx.close();
 }
 
@@ -641,6 +702,7 @@ async function run() {
 
     await checkUpgrade(browser, url);
     await checkEyesAcrossLanguages(browser, url);
+    await checkFolderAndMove(browser, url);
     await browser.close();
     console.log(`${shots.length} shots in ${OUT} (${ENGINE})`);
   } finally {

@@ -31,7 +31,7 @@ const EN = {
     "Reads each page as it opens and picks which of the eight languages it is in, so its schema and class names go to the model in that language. A page in none of them, or one it is unsure of, gets the folder's language. It runs on this computer, like everything else.",
   langDetected: (name: string, pct: number) =>
     `${name}, detected from the page (${pct}% sure). If it is wrong, change it in the extraction settings.`,
-  langChosen: (name: string) => `${name}, chosen for this document in the extraction settings.`,
+  langChosen: (name: string) => `${name}, set for this document alone. Change it in the extraction settings.`,
   langFolder: (name: string) => `${name}, the folder's language.`,
   langUnsure: (name: string) =>
     `${name}, the folder's language: the page's own is not one of the eight, or could not be told.`,
@@ -74,7 +74,6 @@ const EN = {
   backendDown: "The extraction model is not responding. Restart Scrivano and try again.",
   noTauri:
     "This is the browser dev server: opening files, OCR and the model are all unavailable. Run npm run tauri dev instead.",
-  unsupported: (exts: string[]) => `Unsupported file. Use ${exts.join(", ")}.`,
   pickerFailed: (detail: string) => `Could not open the file picker. ${detail}`,
   documentsFilter: "Documents",
 
@@ -83,7 +82,12 @@ const EN = {
   expandRail: "Expand the document list",
   documents: (n: number) => count(n, "document", "documents"),
   railEmpty: "Nothing yet. Documents you open stay in this list.",
-  addDocument: "Add a document",
+  addDocument: "Add documents",
+  openFolder: "Open a folder",
+  openFolderHelp:
+    "Opens every document directly in a folder, one after another in name order: not its subfolders, and not hidden files.",
+  moveTo: (name: string) => `Move ${name} to another project`,
+  moveWhenDone: "Can be moved once it has finished working",
   deleteDocument: (name: string) => `Delete ${name}`,
   fields: (n: number) => count(n, "field", "fields"),
   rowState: { reading: "reading", classifying: "classifying", extracting: "extracting", failed: "failed" },
@@ -98,9 +102,11 @@ const EN = {
   lines: (n: number) => count(n, "line", "lines"),
   pageTab: "Page",
   textTab: "Text",
-  dropToOpen: "Drop to open this file",
-  dropHere: "Drag a document here to read its text",
-  chooseFile: "Choose a file",
+  dropToOpen: "Drop to open",
+  dropHere: "Drag documents or a folder here to read their text",
+  chooseFile: "Choose files",
+  chooseFolder: "Choose a folder",
+  nothingToOpen: (exts: string[]) => `Nothing to open there. Documents can be ${exts.join(", ")}.`,
   formats: "PDF, PNG, JPEG, WebP or TIFF",
   readFailed: (detail: string) => `Could not read this document: ${detail}`,
   page: (n: number) => `Page ${n}`,
@@ -312,7 +318,7 @@ const IT: Dict = {
     "Legge ogni pagina appena si apre e sceglie in quale delle otto lingue è scritta, così schema e nomi delle classi arrivano al modello in quella lingua. Una pagina in nessuna di esse, o di cui non è sicuro, prende la lingua della cartella. Gira su questo computer, come tutto il resto.",
   langDetected: (name, pct) =>
     `Lingua rilevata dalla pagina: ${name} (certezza del ${pct}%). Se è sbagliata, cambiala nelle impostazioni di estrazione.`,
-  langChosen: (name) => `Lingua scelta per questo documento nelle impostazioni di estrazione: ${name}.`,
+  langChosen: (name) => `Lingua impostata per questo solo documento: ${name}. Si cambia nelle impostazioni di estrazione.`,
   langFolder: (name) => `Lingua della cartella: ${name}.`,
   langUnsure: (name) =>
     `Lingua della cartella: ${name}. Quella della pagina non è fra le otto, o non si è potuta stabilire.`,
@@ -353,7 +359,6 @@ const IT: Dict = {
   backendDown: "Il modello di estrazione non risponde. Riavvia Scrivano e riprova.",
   noTauri:
     "Questo è il server di sviluppo del browser: apertura dei file, OCR e modello non sono disponibili. Avvia invece npm run tauri dev.",
-  unsupported: (exts) => `File non supportato. Usa ${exts.join(", ")}.`,
   pickerFailed: (detail) => `Impossibile aprire la finestra di selezione. ${detail}`,
   documentsFilter: "Documenti",
 
@@ -361,7 +366,12 @@ const IT: Dict = {
   expandRail: "Espandi l'elenco dei documenti",
   documents: (n) => count(n, "documento", "documenti"),
   railEmpty: "Ancora niente. I documenti che apri restano in questo elenco.",
-  addDocument: "Aggiungi un documento",
+  addDocument: "Aggiungi documenti",
+  openFolder: "Apri una cartella",
+  openFolderHelp:
+    "Apre tutti i documenti che si trovano direttamente in una cartella, uno dopo l'altro in ordine di nome: non le sottocartelle, né i file nascosti.",
+  moveTo: (name) => `Sposta ${name} in un altro progetto`,
+  moveWhenDone: "Si può spostare quando avrà finito di lavorare",
   deleteDocument: (name) => `Elimina ${name}`,
   fields: (n) => count(n, "campo", "campi"),
   rowState: {
@@ -380,9 +390,11 @@ const IT: Dict = {
   lines: (n) => count(n, "riga", "righe"),
   pageTab: "Pagina",
   textTab: "Testo",
-  dropToOpen: "Rilascia per aprire questo file",
-  dropHere: "Trascina qui un documento per leggerne il testo",
-  chooseFile: "Scegli un file",
+  dropToOpen: "Rilascia per aprire",
+  dropHere: "Trascina qui documenti o una cartella per leggerne il testo",
+  chooseFile: "Scegli i file",
+  chooseFolder: "Scegli una cartella",
+  nothingToOpen: (exts) => `Niente da aprire lì. I documenti possono essere ${exts.join(", ")}.`,
   formats: "PDF, PNG, JPEG, WebP o TIFF",
   readFailed: (detail) => `Impossibile leggere questo documento: ${detail}`,
   page: (n) => `Pagina ${n}`,
