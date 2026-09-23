@@ -37,7 +37,7 @@ const EN = {
     `${name}, the folder's language: the page's own is not one of the eight, or could not be told.`,
   docLanguageHelp:
     "The language THIS document is written in, overriding its folder's. Keys, descriptions and class names go into the prompt in that language, because the model was fine-tuned with the prompt and the page in the same one — an English schema on an Italian page measurably invents values. Separate from the language of this interface.",
-  classHelp: "What the model decided this document is, asked for when it was opened.",
+  classHelp: "What the model decided this document is, asked for when it was opened or when you asked again.",
 
   // Topbar
   betaTitle: "Beta: the model is still moving.",
@@ -229,14 +229,27 @@ const EN = {
   // Classification
   classifyOnOpen: "Classify on open",
   classifyHelp:
-    "The class is asked for once, as soon as a document is opened, because there is nothing to configure per run. Extraction stays manual: it depends on a schema you choose first.",
-  classifyOff: "Classification is off, so documents open without a class. The list below is kept for when it is switched back on.",
+    "The class is asked for as soon as a document is opened, because there is nothing to configure per run, and again when its language is corrected. You can always ask again from the top bar or below. Extraction stays manual: it depends on a schema you choose first.",
+  classifyOff: "Classification on open is off, so documents open without a class. They can still be classified by hand, from the list below.",
   classCount: (n: number) => count(n, "class", "classes"),
   off: "Off",
   restoreClasses: "Restore the twelve trained classes",
   classesChanged:
     "This list no longer matches the twelve classes the model was fine-tuned on. It will still answer with one of these names, but only the trained ones are backed by training.",
   noClass: "no class",
+  classifyNow: "Classify",
+  classifyNowHelp: "Ask the model what kind of document this is, from this folder's class list.",
+  classifyAgain: "Classify again",
+  classifyAgainHelp:
+    "Ask the model again, from this folder's class list as it is now — after the list has been edited, or the document's language corrected.",
+  noClasses: "This folder has no classes to choose from",
+  classifyAll: (n: number) =>
+    n === 0 ? "Classify again" : `Classify ${n === 1 ? "the document" : `all ${n} documents`} again`,
+  classifyingAll: (i: number, n: number) => `Classifying ${i} of ${n}…`,
+  classifyAllHelp:
+    "Asks again for the class of every document in this folder, one after another, from the list above. Worth doing after the list has changed: a document keeps the class it got, even one no longer on the list, until it is asked again.",
+  sweepRunning: "A folder is being classified again",
+  noDocumentsHere: "There are no documents in this folder",
 
   // Projects
   project: "Project",
@@ -305,7 +318,8 @@ const IT: Dict = {
     `Lingua della cartella: ${name}. Quella della pagina non è fra le otto, o non si è potuta stabilire.`,
   docLanguageHelp:
     "La lingua in cui è scritto QUESTO documento, che prevale su quella della cartella. Chiavi, descrizioni e nomi delle classi entrano nel prompt in quella lingua, perché il modello è stato addestrato con prompt e pagina nella stessa: uno schema inglese su una pagina italiana inventa valori in modo misurabile. È una scelta distinta dalla lingua di questa interfaccia.",
-  classHelp: "Che cosa il modello ha deciso che sia questo documento, chiesto all'apertura.",
+  classHelp:
+    "Che cosa il modello ha deciso che sia questo documento, chiesto all'apertura o quando l'hai richiesto.",
 
   betaTitle: "Versione beta: il modello è ancora in evoluzione.",
   statusLabel: {
@@ -491,14 +505,27 @@ const IT: Dict = {
 
   classifyOnOpen: "Classifica all'apertura",
   classifyHelp:
-    "La classe viene chiesta una volta sola, appena il documento viene aperto, perché non c'è nulla da configurare per ogni esecuzione. L'estrazione resta manuale: dipende da uno schema che scegli prima.",
-  classifyOff: "La classificazione è disattivata, quindi i documenti si aprono senza classe. L'elenco qui sotto resta per quando la riattivi.",
+    "La classe viene chiesta appena il documento viene aperto, perché non c'è nulla da configurare per ogni esecuzione, e di nuovo quando se ne corregge la lingua. Puoi sempre richiederla dalla barra in alto o qui sotto. L'estrazione resta manuale: dipende da uno schema che scegli prima.",
+  classifyOff: "La classificazione all'apertura è disattivata, quindi i documenti si aprono senza classe. Puoi comunque classificarli a mano, dall'elenco qui sotto.",
   classCount: (n) => count(n, "classe", "classi"),
   off: "Off",
   restoreClasses: "Ripristina le dodici classi addestrate",
   classesChanged:
     "Questo elenco non corrisponde più alle dodici classi su cui il modello è stato addestrato. Risponderà comunque con uno di questi nomi, ma solo quelli addestrati hanno un addestramento alle spalle.",
   noClass: "senza classe",
+  classifyNow: "Classifica",
+  classifyNowHelp: "Chiedi al modello che tipo di documento è, dall'elenco delle classi di questa cartella.",
+  classifyAgain: "Classifica di nuovo",
+  classifyAgainHelp:
+    "Chiedi di nuovo al modello, dall'elenco delle classi di questa cartella così com'è ora: dopo averlo modificato, o dopo aver corretto la lingua del documento.",
+  noClasses: "Questa cartella non ha classi fra cui scegliere",
+  classifyAll: (n) =>
+    n === 0 ? "Classifica di nuovo" : n === 1 ? "Classifica di nuovo il documento" : `Classifica di nuovo tutti i ${n} documenti`,
+  classifyingAll: (i, n) => `Classificazione ${i} di ${n}…`,
+  classifyAllHelp:
+    "Chiede di nuovo la classe di ogni documento di questa cartella, uno dopo l'altro, dall'elenco qui sopra. Utile dopo averlo cambiato: un documento tiene la classe che ha ricevuto, anche se non è più nell'elenco, finché non viene richiesta di nuovo.",
+  sweepRunning: "Una cartella è già in corso di classificazione",
+  noDocumentsHere: "In questa cartella non ci sono documenti",
 
   project: "Progetto",
   projectSettings: "Impostazioni del progetto",

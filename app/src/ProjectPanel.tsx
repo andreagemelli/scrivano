@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ArrowClockwise, Trash, Warning, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowsClockwise, Trash, Warning, X } from "@phosphor-icons/react";
 import SchemaEditor from "./SchemaEditor";
 import LangPicker from "./LangPicker";
 import { defaultClasses } from "./catalog";
@@ -29,6 +29,9 @@ export default function ProjectPanel({
   project,
   trainedClasses,
   count,
+  sweep,
+  sweepBlocked,
+  onReclassifyAll,
   canDelete,
   onChange,
   onDelete,
@@ -39,6 +42,11 @@ export default function ProjectPanel({
   trainedClasses: Record<string, string>;
   /** How many documents are in here, so deleting says what it costs. */
   count: number;
+  /** This folder being classified again, and how far along, or null. */
+  sweep: { done: number; of: number } | null;
+  /** Why the folder cannot be classified again right now, or "". */
+  sweepBlocked: string;
+  onReclassifyAll: () => void;
   /** The last project cannot go: there must always be somewhere to open into. */
   canDelete: boolean;
   onChange: (p: Project) => void;
@@ -167,15 +175,35 @@ export default function ProjectPanel({
           />
 
           {/* Editing or extending the list is allowed and sometimes right, but
-              the model was fine-tuned on exactly twelve names. Only worth
-              saying while classification is actually going to run. */}
-          {project.classify && drifted && (
+              the model was fine-tuned on exactly twelve names. Said whenever the
+              list differs: it is used on open, and by hand even with that off. */}
+          {drifted && (
             <p className="warn-note">
               <Warning size={14} weight="regular" />
               {t.classesChanged}
             </p>
           )}
           {!project.classify && <p className="hint">{t.classifyOff}</p>}
+
+          {/* The list above only decides documents classified from now on. The
+              ones already in here keep the class they got, even one no longer
+              on the list, until they are asked again. */}
+          <section className="group sweep">
+            <button
+              className="btn"
+              aria-disabled={sweepBlocked !== "" || undefined}
+              aria-describedby="sweep-help"
+              onClick={() => sweepBlocked === "" && onReclassifyAll()}
+            >
+              <ArrowsClockwise size={14} weight="regular" />
+              {sweep ? t.classifyingAll(sweep.done + 1, sweep.of) : t.classifyAll(count)}
+            </button>
+            {/* Why it cannot run, when it cannot, in the text itself: a hint
+                bubble is invisible to a screen reader. */}
+            <p className="setting-help" id="sweep-help">
+              {sweepBlocked || t.classifyAllHelp}
+            </p>
+          </section>
         </div>
 
         {canDelete && (

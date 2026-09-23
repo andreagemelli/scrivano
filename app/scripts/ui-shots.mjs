@@ -268,8 +268,12 @@ function installBackend({ fixtures, seed, detect = ["it", 0.98] }) {
       case "detect_lang":
         return detect;
       case "extract": {
-        const f = lastRead ?? fixtures[0];
+        // The page the prompt carries, not the file read last: a folder
+        // classified again asks about documents read long ago.
+        // Titles are drawn but not OCR'd, so match on the row values, which are.
+        const f = fixtures.find((x) => x.rows.every(([, v]) => args.prompt.includes(v))) ?? lastRead ?? fixtures[0];
         if (args.prompt.includes("Task: document classification")) {
+          window.__classified = (window.__classified ?? 0) + 1;
           // Answer with a name off the list the prompt actually carries, the way
           // the real model does — the class list is in the UI language, so a
           // hard-coded Italian answer would be rejected by parseClass in English.
@@ -277,10 +281,12 @@ function installBackend({ fixtures, seed, detect = ["it", 0.98] }) {
           const pick = f.klass.find((name) => listed.includes(`${name}: `)) ?? f.klass[0];
           return JSON.stringify({ class: pick });
         }
-        // Extraction streams, so the caller's live view has something to show.
+        // Extraction streams on the run's own channel, the way Tauri delivers
+        // one: an index per message, so the Channel can keep them in order.
         const text = JSON.stringify(f.answer, null, 0);
-        for (const piece of text.match(/.{1,4}/gs) ?? []) {
-          for (const h of listeners.get("token") ?? []) runCallback(h, { event: "token", payload: piece });
+        const pieces = text.match(/.{1,4}/gs) ?? [];
+        for (const [index, message] of pieces.entries()) {
+          runCallback(args.onToken.id, { index, message });
           await new Promise((r) => setTimeout(r, 12));
         }
         return text;
@@ -344,6 +350,47 @@ async function pickMenu(page, wrapper, re) {
   await page.waitForTimeout(120);
   await page.locator(`${wrapper} .popover button`, { hasText: re }).first().click();
   await page.waitForTimeout(160);
+}
+
+/**
+ * Asking again: once for the open document from the top bar, then for the
+ * whole folder from its drawer. Counted at the fake model, so a button that
+ * only looks busy does not pass.
+ */
+async function checkReclassify(page) {
+  const runs = () => page.evaluate(() => window.__classified ?? 0);
+  // Which class each document is filed under, so asking again can be seen to
+  // agree with asking the first time rather than only to have happened.
+  const filed = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll(".rail-list > *")].map((el) =>
+        el.classList.contains("rail-group") ? `#${el.textContent}` : el.querySelector(".doc-name")?.textContent,
+      ),
+    );
+  const grouped = await filed();
+  const before = await runs();
+  await page.locator(".topbar .tag-act").click();
+  await page.waitForFunction((n) => (window.__classified ?? 0) > n, before);
+  await page.waitForTimeout(200);
+  await shot(page, "22-classify-again");
+  await page.locator(".folder.active .folder-act").first().click();
+  await page.waitForSelector(".drawer");
+  const all = page.locator(".drawer .sweep .btn");
+  const docs = await page.locator(".doc-card").count();
+  await all.click();
+  await page.waitForTimeout(40);
+  await shot(page, "23-classify-all");
+  await page.waitForFunction((n) => (window.__classified ?? 0) >= n, before + 1 + docs, { timeout: 15000 });
+  await page.waitForFunction(() => !/…/.test(document.querySelector(".drawer .sweep .btn")?.textContent ?? ""));
+  const after = await runs();
+  if (after !== before + 1 + docs) throw new Error(`expected ${1 + docs} classification runs, got ${after - before}`);
+  const regrouped = await filed();
+  if (JSON.stringify(regrouped) !== JSON.stringify(grouped)) {
+    throw new Error(`asking again changed the classes: ${grouped} -> ${regrouped}`);
+  }
+  await page.locator(".drawer-close").click();
+  await page.waitForTimeout(200);
+  console.log(`  reclassify check: 1 from the top bar, ${docs} from the folder`);
 }
 
 /** The page's language reached the topbar and the schema the model will be shown. */
@@ -544,6 +591,7 @@ async function run() {
 
       await pickMenu(page, ".rail-top .menu", /class|classe/i);
       await shot(page, `07-rail-grouped-${scheme}`);
+      if (scheme === "light") await checkReclassify(page);
 
       // Projects: a second folder, with its own classification settings.
       await page.locator(".folder-new").click();

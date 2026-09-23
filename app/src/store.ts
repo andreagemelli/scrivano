@@ -54,6 +54,14 @@ async function prefStore() {
  */
 function normalise(docs: Doc[]): Doc[] {
   for (const d of docs) {
+    // A working status on disk means the app quit mid-run, and nothing is
+    // running now. Left as it was, the document would say "Classifying" for
+    // ever and refuse every run, the one way out being to delete it.
+    if (d.status === "classifying" || d.status === "extracting") {
+      d.status = d.error ? "failed" : d.raw !== undefined ? "done" : "ready";
+    } else if (d.status === "reading") {
+      d.status = d.pages?.length ? "ready" : "failed";
+    }
     for (const p of d.pages ?? []) {
       p.lines = (p.lines ?? []).map((l: Line | string) =>
         typeof l === "string" ? { text: l } : l,

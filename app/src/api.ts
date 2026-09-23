@@ -1,6 +1,5 @@
 /** The only file that talks to Rust. Names here must match the #[tauri::command] fns. */
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { Line, Sampling } from "./types";
 
 /**
@@ -18,18 +17,23 @@ export function ocr(png: Uint8Array): Promise<Line[]> {
   return invoke("ocr", { png: Array.from(png) });
 }
 
-/** Subscribe before invoking, or the first tokens of a fast page are lost. */
+/**
+ * One model run, its tokens on a channel of its own. The returned string is the
+ * whole answer: a channel's last pieces can land after the run resolves, so
+ * they are dropped rather than appended to a stream the caller has closed.
+ */
 export async function extract(
   prompt: string,
   sampling: Sampling,
   onToken: (t: string) => void,
 ): Promise<string> {
-  const unlisten = await listen<string>("token", (e) => onToken(e.payload));
+  let live = true;
+  const onTokenChannel = new Channel<string>((t) => live && onToken(t));
   try {
     // Sampling goes over camelCase; the Rust struct renames to match.
-    return await invoke<string>("extract", { prompt, sampling });
+    return await invoke<string>("extract", { prompt, sampling, onToken: onTokenChannel });
   } finally {
-    unlisten();
+    live = false;
   }
 }
 

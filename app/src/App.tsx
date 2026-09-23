@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Gear, Play, Tag as TagIcon, Translate, WarningCircle, X } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  ArrowsClockwise,
+  Gear,
+  Play,
+  Tag as TagIcon,
+  Translate,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { backendStatus, detectLang, extract, inTauri } from "./api";
@@ -76,6 +85,40 @@ function blocker(
   return "";
 }
 
+/** Empty string means "classify again" can run on this document. */
+function classifyBlocker(
+  t: Dict,
+  doc: Doc | null,
+  project: Project,
+  backend: { ok: boolean; detail: string } | null,
+): string {
+  if (!doc) return t.needDocument;
+  if (doc.status === "reading") return t.stillReading;
+  if (doc.status === "classifying") return t.stillClassifying;
+  if (doc.status === "extracting") return t.alreadyExtracting;
+  if (doc.pages.every((p) => p.lines.length === 0)) return t.noText;
+  if (project.classes.length === 0) return t.noClasses;
+  if (!inTauri) return t.noDevServer;
+  if (backend && !backend.ok) return t.noModel;
+  return "";
+}
+
+/** Empty string means a whole folder can be classified again. */
+function sweepBlocker(
+  t: Dict,
+  docs: Doc[],
+  project: Project,
+  backend: { ok: boolean; detail: string } | null,
+  running: boolean,
+): string {
+  if (running) return t.sweepRunning;
+  if (docs.length === 0) return t.noDocumentsHere;
+  if (project.classes.length === 0) return t.noClasses;
+  if (!inTauri) return t.noDevServer;
+  if (backend && !backend.ok) return t.noModel;
+  return "";
+}
+
 /** Session storage, because a private window or a locked-down webview can throw. */
 function railFromSession(): boolean {
   try {
@@ -124,6 +167,15 @@ export default function App() {
   // while it waited — a schema changed while its file was still being read.
   const docsNow = useRef<Doc[]>(INITIAL);
   docsNow.current = docs;
+  // Same reason: a sweep over a folder must classify with the list as it is
+  // when it reaches each document, not as it was when the sweep began.
+  const projectsNow = useRef(projects);
+  projectsNow.current = projects;
+  // A folder being classified again, one document after another, and how far along.
+  const [sweep, setSweep] = useState<{ projectId: string; done: number; of: number } | null>(null);
+  // Documents owed a new class, asked for while they were busy with a run of
+  // their own: they are asked again the moment they are free.
+  const owed = useRef(new Set<string>());
   const gearRef = useRef<HTMLButtonElement>(null);
 
   const t = DICTS[lang];
@@ -237,7 +289,15 @@ export default function App() {
    */
   function changeDocLang(next: DocLang) {
     if (samePreset(fields, defaultFields(docLang))) setFields(presetFor(next, fields, docLang, shut));
-    if (doc) patch(doc.id, { docLang: next });
+    if (doc) {
+      patch(doc.id, { docLang: next });
+      // Its class was chosen from a list in the language it was thought to be
+      // in; a corrected language is a reason to ask again — when the model
+      // would be shown something different, which an edited list never is.
+      const shown = (l: DocLang) => classesShown(project.classes, project.docLang, l);
+      const differs = !samePreset(shown(next), shown(docLang));
+      if (differs && (doc.docClass !== undefined || project.classify)) void reclassify(doc.id, next);
+    }
     // The draft language follows either way, because setFields writes the draft
     // either way: letting them disagree meant the next folder you opened saw a
     // draft whose keys were one language and whose language said another.
@@ -267,7 +327,9 @@ export default function App() {
 
   function chooseProject(id: string) {
     const next = projects.find((p) => p.id === id);
-    if (!next) return;
+    // The folder you are in: nothing to switch, and nothing to deselect —
+    // its gear goes through here, and it used to close the open document.
+    if (!next || id === projectId) return;
     setProjectId(id);
     setActiveId(null);
     // A folder you switch into brings its own language, and with it the schema
@@ -400,19 +462,22 @@ export default function App() {
   }
 
   /**
-   * Ask the model what kind of document this is, once, on open.
-   *
-   * Unlike extraction there is nothing to set up first — the class list is the
-   * same for every document — so waiting for a button press buys nothing. A
-   * failure here is not the document's failure: it still opens, and it still
-   * extracts. It just opens without a class.
+   * Ask the model what kind of document this is: on open when the folder
+   * classifies, and again by hand (`asked`) — from the top bar, the folder's
+   * sweep, or a corrected language. A failure here is not the document's
+   * failure: it still opens and extracts, and any class it had stays.
    */
-  async function classifyDoc(id: string, pages: Page[], project: Project, docLang: DocLang) {
+  async function classifyDoc(id: string, pages: Page[], project: Project, docLang: DocLang, asked = false) {
     const lines = pages.flatMap((p) => p.lines.map((l) => l.text));
-    if (!project.classify || project.classes.length === 0 || lines.length === 0 || !inTauri) {
-      patch(id, { status: "ready" });
+    // "Classify on open" governs opening; asking by hand is its own decision.
+    if ((!project.classify && !asked) || project.classes.length === 0 || lines.length === 0 || !inTauri) {
+      if (!asked) patch(id, { status: "ready" });
       return;
     }
+    // Back to what it was once the class is in: a document classified again
+    // after its extraction is still done, not merely ready.
+    const was = docsNow.current.find((d) => d.id === id)?.status;
+    const after: Status = was === "done" || was === "failed" ? was : "ready";
     patch(id, { status: "classifying" });
     try {
       const shown = classesShown(project.classes, project.docLang, docLang);
@@ -424,10 +489,55 @@ export default function App() {
       // one is indistinguishable from classification being switched off, which
       // is exactly how a 100% failure rate went unnoticed.
       if (picked === null) console.warn("classification answered off the list:", raw.trim());
-      patch(id, { status: "ready", docClass: picked ?? undefined });
+      patch(id, { status: after, docClass: picked ?? undefined });
     } catch (e) {
+      // The class it had stays: a failed run is not an answer.
       console.error("classification failed", e);
-      patch(id, { status: "ready" });
+      patch(id, { status: after });
+    }
+  }
+
+  /**
+   * Ask again, by hand: after the folder's class list changed, or the page's
+   * language did. With the folder's list as it is now, in `lang` if given.
+   */
+  async function reclassify(id: string, lang?: DocLang) {
+    const d = docsNow.current.find((x) => x.id === id);
+    if (!d) return;
+    if (d.status === "reading" || d.status === "classifying" || d.status === "extracting") {
+      // Busy with a run of its own: its turn comes when that ends, not never.
+      owed.current.add(id);
+      return;
+    }
+    const home = projectsNow.current.find((p) => p.id === projectOf(d)) ?? projectsNow.current[0];
+    await classifyDoc(id, d.pages, home, lang ?? d.docLang ?? home.docLang, true);
+  }
+
+  // Pays what `reclassify` could not: every owed document that is free now,
+  // in the language it has now, which is whatever it was last corrected to.
+  useEffect(() => {
+    for (const id of owed.current) {
+      const d = docs.find((x) => x.id === id);
+      if (d && (d.status === "reading" || d.status === "classifying" || d.status === "extracting")) continue;
+      owed.current.delete(id);
+      if (d) void reclassify(id);
+    }
+  }, [docs]);
+
+  /**
+   * Every document in a folder, one after another. The model runs one thing at
+   * a time anyway, and a queue that says how far it has got is easier to trust
+   * than a dozen spinners.
+   */
+  async function reclassifyAll(projectId: string) {
+    const ids = docsNow.current.filter((d) => projectOf(d) === projectId).map((d) => d.id);
+    try {
+      for (const [i, id] of ids.entries()) {
+        setSweep({ projectId, done: i, of: ids.length });
+        await reclassify(id);
+      }
+    } finally {
+      setSweep(null);
     }
   }
 
@@ -549,7 +659,7 @@ export default function App() {
     setHighlight(null);
     // Decode rate, measured from the first token: everything before it is
     // prompt processing, and counting that would report a speed the model is
-    // not running at. One "token" event is one token, so counting them is exact.
+    // not running at. One channel message is one token, so counting them is exact.
     let started = 0;
     let n = 0;
     let tps: number | undefined;
@@ -578,6 +688,7 @@ export default function App() {
 
   const status: Status = doc?.status ?? "empty";
   const reason = blocker(t, doc, fields, backend);
+  const classifyWhy = classifyBlocker(t, doc, project, backend);
   const modelDown = !inTauri || (backend !== null && !backend.ok);
   const statusText = status === "ready" && modelDown ? t.modelUnavailable : t.statusLabel[status];
 
@@ -607,6 +718,32 @@ export default function App() {
               {doc.docClass}
             </span>
           )}
+          {/* Asking again sits on the tag it would change. With no class yet it
+              is the tag's own place, dashed, so the empty state reads as "not
+              asked" rather than as a class called nothing. */}
+          {doc && doc.pages.length > 0 &&
+            (doc.docClass === undefined ? (
+              <button
+                className="tag tag-btn"
+                aria-disabled={classifyWhy !== "" || undefined}
+                aria-description={classifyWhy || undefined}
+                data-hint={classifyWhy || t.classifyNowHelp}
+                onClick={() => classifyWhy === "" && void reclassify(doc.id)}
+              >
+                <TagIcon size={12} weight="regular" />
+                {doc.status === "classifying" ? t.statusLabel.classifying : t.classifyNow}
+              </button>
+            ) : (
+              <button
+                className="icon-btn tag-act"
+                aria-label={classifyWhy || t.classifyAgain}
+                aria-disabled={classifyWhy !== "" || undefined}
+                data-hint={classifyWhy || t.classifyAgainHelp}
+                onClick={() => classifyWhy === "" && void reclassify(doc.id)}
+              >
+                <ArrowsClockwise size={14} weight="regular" />
+              </button>
+            ))}
           {/* The language everything the model sees is written in, and where
               that came from: the page itself, a choice, or the folder. */}
           {doc && doc.pages.length > 0 && (
@@ -742,6 +879,9 @@ export default function App() {
             project={project}
             trainedClasses={classesFor(project.docLang)}
             count={inProject.length}
+            sweep={sweep?.projectId === project.id ? sweep : null}
+            sweepBlocked={sweepBlocker(t, inProject, project, backend, sweep !== null)}
+            onReclassifyAll={() => void reclassifyAll(project.id)}
             canDelete={projects.length > 1}
             onChange={changeProject}
             onDelete={() => removeProject(project.id)}
