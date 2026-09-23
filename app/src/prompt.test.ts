@@ -1,6 +1,18 @@
 /** npm test. Guards the model contract: if this fails, extraction quality is next. */
 import { buildSystem, buildPrompt, parseAnswer, parseClass, isGrounded } from "./prompt";
-import { DOC_LANGS, classAlias, classesFor, defaultClasses, defaultFields, schemaFor } from "./catalog";
+import {
+  DOC_LANGS,
+  classAlias,
+  classesFor,
+  classesShown,
+  eyeOf,
+  presetFor,
+  samePreset,
+  withEyes,
+  defaultClasses,
+  defaultFields,
+  schemaFor,
+} from "./catalog";
 
 /** No framework and no @types/node: one comparison is the whole harness. */
 function eq(got: unknown, want: unknown, what = "") {
@@ -102,6 +114,48 @@ for (const from of DOC_LANGS) {
 }
 // An alias must never resurrect a class the caller deliberately removed.
 eq(parseClass('{"class": "dichiarazione"}', english.filter((c) => c.key !== "declaration"), classAlias("en")), null);
+
+// A page in another language than its folder: while the folder's list is the
+// trained twelve the model is shown them in the page's language, and the answer
+// is read against the folder's own list, so one folder groups by one set of tags.
+{
+  const folder = defaultClasses("en");
+  const shown = classesShown(folder, "en", "it");
+  eq(shown, defaultClasses("it"), "shown in the page's language");
+  eq(parseClass('{"class": "dichiarazione"}', folder, classAlias("en")), "declaration", "filed under the folder's name");
+  // An edited list — a new class, or a reworded description — cannot be translated.
+  const added = [...folder.slice(0, 11), { key: "memo", description: "an internal note" }];
+  eq(classesShown(added, "en", "it"), added, "an added class keeps the list");
+  const reworded = folder.map((c, i) => (i === 0 ? { ...c, description: "any form, however short" } : c));
+  eq(classesShown(reworded, "en", "it"), reworded, "a reworded description keeps the list");
+  eq(classesShown(folder, "en", "en"), folder, "same language: nothing to swap");
+}
+
+// The eye across languages. It is remembered by what a key means, so closing
+// `name`... on an English page closes the same thing in the Italian preset; one
+// with nothing to land on comes along as its own row. A swap never opens one.
+{
+  eq(eyeOf("it", "cognome"), eyeOf("de", "nachname"), "the same concept in two languages");
+  eq(eyeOf("it", "codice-fiscale"), "key:codice-fiscale", "a key only Italian has");
+  const shut = { [eyeOf("it", "cognome")]: true, [eyeOf("it", "codice-fiscale")]: true };
+  const it = withEyes(defaultFields("it"), "it", shut);
+  eq(it.filter((f) => f.hidden).map((f) => f.key), ["cognome", "codice-fiscale"]);
+  // German asks for the full `name`, which holds the surname: it closes, and
+  // covers the surname. The tax code has no German key, so it comes along as
+  // its own row, still closed.
+  const de = presetFor("de", it, "it", shut);
+  eq(de.filter((f) => f.hidden).map((f) => f.key), ["name", "codice-fiscale"], "no eye is lost");
+  // A full name hidden in English lands on both halves of the Italian preset,
+  // and does not come along as a row of its own.
+  const en = withEyes(defaultFields("en"), "en", { [eyeOf("en", "name")]: true });
+  const fromEn = presetFor("it", en, "en", { [eyeOf("en", "name")]: true });
+  eq(fromEn.filter((f) => f.hidden).map((f) => f.key), ["nome", "cognome"]);
+  // An eye opened on purpose stays open, even on a part of a hidden whole.
+  const open = { [eyeOf("en", "name")]: true, [eyeOf("it", "nome")]: false };
+  eq(withEyes(defaultFields("it"), "it", open).filter((f) => f.hidden).map((f) => f.key), ["cognome"]);
+  eq(samePreset(it, defaultFields("it")), true, "an eye is not an edit");
+  eq(samePreset([{ ...it[0], description: "x" }, ...it.slice(1)], defaultFields("it")), false, "a description is");
+}
 
 /** The class list as the settings panel keeps it: same shape, order preserved. */
 function classesToFields() {

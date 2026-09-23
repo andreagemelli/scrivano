@@ -115,7 +115,11 @@ const FIXTURES = [
 // The fake Rust side. Everything below runs inside the page, before app code.
 // ---------------------------------------------------------------------------
 
-function installBackend({ fixtures, seed }) {
+/**
+ * `detect` is what lid.176 would say about every page: the fixtures are all
+ * Italian, so Italian and sure, unless a state needs detection to be unsure.
+ */
+function installBackend({ fixtures, seed, detect = ["it", 0.98] }) {
   const store = new Map(seed ? Object.entries(seed) : []);
   const listeners = new Map();
   const callbacks = new Map();
@@ -261,6 +265,8 @@ function installBackend({ fixtures, seed }) {
       }
       case "ocr":
         return pages.get(lastRead.path).boxes;
+      case "detect_lang":
+        return detect;
       case "extract": {
         const f = lastRead ?? fixtures[0];
         if (args.prompt.includes("Task: document classification")) {
@@ -340,13 +346,13 @@ async function pickMenu(page, wrapper, re) {
   await page.waitForTimeout(160);
 }
 
-/** Tell the app what language the documents are in, through the real control. */
-async function setDocLang(page, lang) {
-  await page.getByRole("button", { name: /^Settings$/ }).click();
-  await page.waitForTimeout(200);
-  await pickMenu(page, ".doclang .menu", lang === "it" ? /Italiano/ : /English/);
-  await page.locator(".drawer-close").click();
-  await page.waitForTimeout(200);
+/** The page's language reached the topbar and the schema the model will be shown. */
+async function checkDetected(page) {
+  const tag = (await page.locator(".topbar .tag", { hasText: /^[A-Z]{2}$/ }).first().textContent())?.trim();
+  if (tag !== "IT") throw new Error(`expected the detected language IT in the topbar, got ${tag}`);
+  const keys = await page.locator(".preview-row .jkey").allTextContents();
+  if (!keys.includes('"cognome"')) throw new Error(`expected the Italian preset after detection, got ${keys}`);
+  console.log("  detection check: IT, with the Italian preset");
 }
 
 async function openDoc(page, n = 1) {
@@ -379,7 +385,9 @@ async function checkUpgrade(browser, url) {
   const ctx = await browser.newContext({ viewport: WIDE, colorScheme: "light", deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.error("  [upgrade] page error:", e.message));
-  await page.addInitScript(installBackend, { fixtures: FIXTURES, seed: { docs: [STALE_DOC] } });
+  // Detection unsure, so the folder's English stands and the check below is
+  // about which schema a new document starts from, not about its language.
+  await page.addInitScript(installBackend, { fixtures: FIXTURES, seed: { docs: [STALE_DOC] }, detect: null });
   await page.goto(url);
   await page.waitForSelector(".doc-card");
 
@@ -432,6 +440,36 @@ async function checkHidden(page) {
   console.log(`  hidden check: text and JSON masked, PDF ${size} bytes with no text layer`);
 }
 
+/**
+ * The regression 0.4.0 almost shipped: an eye closed on an English schema,
+ * then an Italian page detected, whose preset has none of the English keys.
+ * The eye is remembered by what the field means, so it must arrive closed.
+ */
+async function checkEyesAcrossLanguages(browser, url) {
+  const ctx = await browser.newContext({ viewport: WIDE, colorScheme: "light", deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  page.on("pageerror", (e) => console.error("  [eyes] page error:", e.message));
+  await page.addInitScript(installBackend, { fixtures: FIXTURES });
+  await page.goto(url);
+  await page.waitForSelector(".app");
+  await page.getByRole("button", { name: /^Settings$/ }).click();
+  await page.waitForTimeout(220);
+  await page.locator(".field", { has: page.locator('.k[value="name"]') }).locator(".eye").click();
+  await page.locator(".drawer-close").click();
+  await page.waitForTimeout(200);
+  await openDoc(page, 1);
+  const hidden = await page
+    .locator(".preview-row", { has: page.locator(".preview-eye") })
+    .locator(".jkey")
+    .allTextContents();
+  if (!hidden.includes('"nome"') || !hidden.includes('"cognome"')) {
+    throw new Error(`an English eye on "name" did not reach the Italian preset: ${hidden}`);
+  }
+  await shot(page, "21-eye-across-languages");
+  console.log(`  eyes check: "name" closed in English arrived as ${hidden.join(", ")}`);
+  await ctx.close();
+}
+
 async function run() {
   await rm(OUT, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
@@ -465,11 +503,11 @@ async function run() {
       await openDoc(page, 1);
       await shot(page, `02-classified-${scheme}`);
 
-      // The fixtures are Italian pages, so say so before extracting. This is the
-      // setting the whole release turns on: an English schema over an Italian
-      // document returns almost nothing, which is what the app used to do by
-      // default and what these shots used to show.
-      await setDocLang(page, "it");
+      // The fixtures are Italian pages in an English folder. Nobody says so any
+      // more: the page's language is detected on open, and the schema and class
+      // list follow it, which is what an English schema over an Italian page
+      // needed and what these shots used to have to do by hand.
+      if (scheme === "light") await checkDetected(page);
       await page.getByRole("button", { name: /^Extract$/ }).click();
       await page.waitForTimeout(180);
       await shot(page, `03-extracting-${scheme}`);
@@ -554,6 +592,7 @@ async function run() {
     await ctx.close();
 
     await checkUpgrade(browser, url);
+    await checkEyesAcrossLanguages(browser, url);
     await browser.close();
     console.log(`${shots.length} shots in ${OUT} (${ENGINE})`);
   } finally {

@@ -14,10 +14,13 @@
  * are in Italian".
  */
 import classes from "./classes.json";
+import concepts from "./concepts.json";
 import schemas from "./schemas.json";
 import type { DocLang, Field } from "./types";
 
 const SCHEMAS: Record<DocLang, Record<string, string>> = schemas;
+/** Per language, key → the concept it names across languages, or null for a key only one has. */
+const CONCEPTS: Record<DocLang, Record<string, string | null>> = concepts;
 const CLASSES: Record<string, Record<DocLang, { name: string; description: string }>> = classes;
 
 /**
@@ -85,4 +88,93 @@ export function classAlias(lang: DocLang): Record<string, string> {
     for (const l of DOC_LANGS) out[c[l].name.toLowerCase()] = c[lang].name;
   }
   return out;
+}
+
+/**
+ * The class list a page in `docLang` is shown.
+ *
+ * A folder's classes are written in the folder's language, but the model has to
+ * see them in the page's: an Italian list over a German page is the same shift
+ * as an Italian schema over it. While the folder's list is still the trained
+ * twelve it is swapped for the same twelve in the page's language. An edited
+ * list is somebody's work and cannot be translated, so it goes as it is. The
+ * answer is read against the folder's own list either way: `classAlias` already
+ * files a class named in any language under the folder's name for it.
+ */
+export function classesShown(folder: Field[], folderLang: DocLang, docLang: DocLang): Field[] {
+  return folderLang !== docLang && samePreset(folder, defaultClasses(folderLang))
+    ? defaultClasses(docLang)
+    : folder;
+}
+
+/**
+ * Two lists naming the same entries in the same order, with the same wording:
+ * nobody has edited this one, so it may be swapped for another language's.
+ * The eye is not wording — `withEyes` carries it across a swap.
+ */
+export function samePreset(a: Field[], b: Field[]): boolean {
+  return a.length === b.length && a.every((f, i) => f.key === b[i].key && f.description === b[i].description);
+}
+
+/**
+ * What an eye is remembered by. The same field has a different key in every
+ * language — `cognome`, `nachname`, `surname` — and the dataset maps them onto
+ * one concept, so an eye closed on one is closed on all of them. A key only one
+ * language has, like `codice-fiscale`, is remembered by itself.
+ */
+export function eyeOf(lang: DocLang, key: string): string {
+  const concept = CONCEPTS[lang]?.[key];
+  return concept ? `concept:${concept}` : `key:${key}`;
+}
+
+/**
+ * A full name holds a first name and a surname. Presets split names differently
+ * — Italian asks for `nome` and `cognome`, German for `name` and `vorname`,
+ * English for `name` alone — so hiding one part and showing the whole would
+ * show the part. An eye closed on either side closes the other, unless that one
+ * was opened on purpose.
+ */
+const PARTS: Record<string, string[]> = {
+  "concept:full_name": ["concept:first_name", "concept:surname"],
+  "concept:first_name": ["concept:full_name"],
+  "concept:surname": ["concept:full_name"],
+};
+
+/** Whether the eye on `eye` is closed, open, or undecided. */
+function closed(eye: string, shut: Record<string, boolean>): boolean | undefined {
+  if (eye in shut) return shut[eye];
+  return Object.entries(PARTS).some(([from, to]) => shut[from] && to.includes(eye)) || undefined;
+}
+
+/** A schema in `lang` with the remembered eyes applied: closed where closed anywhere, open where opened. */
+export function withEyes(fields: Field[], lang: DocLang, shut: Record<string, boolean>): Field[] {
+  return fields.map((f) => {
+    const hidden = closed(eyeOf(lang, f.key), shut);
+    if (hidden === undefined) return f;
+    const { hidden: _, ...rest } = f;
+    return hidden ? { ...rest, hidden: true } : rest;
+  });
+}
+
+/**
+ * `to`'s preset, taking the place of an untouched schema in `fromLang`.
+ *
+ * A swap must never open an eye. Eyes land on the same concept in the new
+ * preset; one with nothing to land on — a `codice-fiscale` swapped for German —
+ * comes along as its own row, still closed, rather than being dropped. An
+ * untrained key in the prompt costs a little; a name in clear costs the point.
+ */
+export function presetFor(
+  to: DocLang,
+  from: Field[],
+  fromLang: DocLang,
+  shut: Record<string, boolean>,
+): Field[] {
+  const preset = withEyes(defaultFields(to), to, shut);
+  const covered = new Set(preset.filter((f) => f.hidden).map((f) => eyeOf(to, f.key)));
+  // Landed on itself, or on all of its parts: a hidden first name and surname
+  // already black out the full name they make up.
+  const lands = (eye: string) => covered.has(eye) || (PARTS[eye]?.every((p) => covered.has(p)) ?? false);
+  const stranded = from.filter((f) => f.hidden && !lands(eyeOf(fromLang, f.key)));
+  return [...preset, ...stranded];
 }

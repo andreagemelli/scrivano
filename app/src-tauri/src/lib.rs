@@ -1,3 +1,4 @@
+mod lid;
 mod llm;
 mod ocr;
 
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, Manager};
 
-const RESOURCES: [&str; 4] = ["det.onnx", "rec.onnx", "dict.txt", "model.gguf"];
+const RESOURCES: [&str; 5] = ["det.onnx", "rec.onnx", "dict.txt", "model.gguf", "lid.176.ftz"];
 
 /// Bundled resource, falling back to the repo copy so `tauri dev` works before
 /// anything has been bundled.
@@ -76,6 +77,13 @@ async fn extract(app: AppHandle, prompt: String, sampling: llm::Sampling) -> Res
     .map_err(|e| e.to_string())
 }
 
+/// The page's language and how sure of it, as `["it", 0.97]`, or null when the
+/// folder's language should stand. Tens of microseconds, so no blocking pool.
+#[tauri::command]
+async fn detect_lang(app: AppHandle, text: String) -> Result<Option<(String, f32)>, String> {
+    lid::detect(&res(&app, "lid.176.ftz"), &text).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -83,7 +91,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .invoke_handler(tauri::generate_handler![ocr, extract, backend_status])
+        .invoke_handler(tauri::generate_handler![ocr, extract, detect_lang, backend_status])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_, event| {
