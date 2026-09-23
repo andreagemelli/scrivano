@@ -140,10 +140,15 @@ const PARTS: Record<string, string[]> = {
   "concept:surname": ["concept:full_name"],
 };
 
+/** Closed only because a part or the whole of the same name was. */
+function implied(eye: string, shut: Record<string, boolean>): boolean {
+  return !(eye in shut) && Object.entries(PARTS).some(([from, to]) => shut[from] && to.includes(eye));
+}
+
 /** Whether the eye on `eye` is closed, open, or undecided. */
 function closed(eye: string, shut: Record<string, boolean>): boolean | undefined {
   if (eye in shut) return shut[eye];
-  return Object.entries(PARTS).some(([from, to]) => shut[from] && to.includes(eye)) || undefined;
+  return implied(eye, shut) || undefined;
 }
 
 /** A schema in `lang` with the remembered eyes applied: closed where closed anywhere, open where opened. */
@@ -175,6 +180,12 @@ export function presetFor(
   // Landed on itself, or on all of its parts: a hidden first name and surname
   // already black out the full name they make up.
   const lands = (eye: string) => covered.has(eye) || (PARTS[eye]?.every((p) => covered.has(p)) ?? false);
-  const stranded = from.filter((f) => f.hidden && !lands(eyeOf(fromLang, f.key)));
+  // Only an eye someone closed travels as its own row. One closed by the name
+  // rule follows the rule wherever it lands instead: hiding a surname hid the
+  // English full name, but an Italian preset has its own surname to close.
+  const stranded = from.filter((f) => {
+    const eye = eyeOf(fromLang, f.key);
+    return f.hidden && !lands(eye) && !implied(eye, shut);
+  });
   return [...preset, ...stranded];
 }

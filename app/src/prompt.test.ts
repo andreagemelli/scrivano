@@ -150,6 +150,12 @@ eq(parseClass('{"class": "dichiarazione"}', english.filter((c) => c.key !== "dec
   const en = withEyes(defaultFields("en"), "en", { [eyeOf("en", "name")]: true });
   const fromEn = presetFor("it", en, "en", { [eyeOf("en", "name")]: true });
   eq(fromEn.filter((f) => f.hidden).map((f) => f.key), ["nome", "cognome"]);
+  // A surname hidden closes the English full name by the rule, and that derived
+  // eye does not come along into Italian, whose own surname takes it.
+  const bySurname = { [eyeOf("it", "cognome")]: true };
+  const enDraft = withEyes(defaultFields("en"), "en", bySurname);
+  eq(enDraft.filter((f) => f.hidden).map((f) => f.key), ["name"], "the rule closes the whole");
+  eq(presetFor("it", enDraft, "en", bySurname).filter((f) => f.hidden).map((f) => f.key), ["cognome"]);
   // An eye opened on purpose stays open, even on a part of a hidden whole.
   const open = { [eyeOf("en", "name")]: true, [eyeOf("it", "nome")]: false };
   eq(withEyes(defaultFields("it"), "it", open).filter((f) => f.hidden).map((f) => f.key), ["cognome"]);
