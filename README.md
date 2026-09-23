@@ -12,7 +12,7 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 > **The project born as a toy excercise for finetuning and extending LFM-2.5-350M for italian and KIE. I am now having fun adding new capabilities!**
 
-![beta](https://img.shields.io/badge/release-0.2.0--beta-1d4ed8)
+![beta](https://img.shields.io/badge/release-0.3.0--beta-1d4ed8)
 ![macOS](https://img.shields.io/badge/macOS-supported-informational)
 ![Windows](https://img.shields.io/badge/Windows-supported-informational)
 ![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-lightgrey)
@@ -21,24 +21,26 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 ![Scrivano: a residence declaration classified and extracted, with the folder it was filed in](docs/screenshot-app.png)
 
-## What is new in 0.2.0
+## What is new in 0.3.0
 
-A new model, and with it a second thing the app can do.
+**Hide a value before you hand the document on.** Every extracted field has an eye. Close it and
+the value leaves the app as `[REDACTED]` — in the JSON you copy or download, in the document's
+text, and on the page itself, painted over in black. The point is a document you can give to
+another agent without giving it the name, the tax code or the address on it.
 
-- **Eight languages, not one.** Italian, German, Spanish, French, Portuguese, Chinese, Japanese,
-  English. Avg F1 went from 0.22 to **0.75** on the multilingual val split.
-- **Document classification**, alongside extraction. It runs on its own, the moment a document
-  finishes reading, and the answer shows up as a tag on the document.
-- **Projects.** Documents live in folders. A folder carries the language its documents are
-  written in and the classes they can be given — so it decides what a new document in it starts
-  from. A folder of Italian invoices and a folder of German forms want neither the same schema
-  nor the same class list.
-- **Group and sort** the document list by that tag, from the filter in the rail.
-- **Language is a property of the paperwork, at two scopes.** The interface speaks English or
-  Italian. Your *documents* can be in any of the model's eight, and that is the one that matters:
-  keys, descriptions and class names go into the prompt in the document's language, because that
-  is how the model was trained. A project sets it for everything filed in it; one extraction can
-  override it for the odd page that does not match its folder.
+- **The PDF is rebuilt from pixels.** *Download as PDF* renders every page with the hidden values
+  painted into the image and writes nothing else: no text layer, nothing of the source file. There
+  is nothing under the black box to select and copy back out.
+- **Copy the text** hands over the page text with the same values replaced, ready to paste.
+- **The eye belongs to the field, not to one document**, so the next document inherits it: hide
+  `codice-fiscale` once and a whole batch comes out without one.
+- **It hides what the model extracted**, wherever that text occurs on the page and every time it
+  does. A hidden value the page does not contain — misread by the OCR, or invented by the model —
+  is flagged *not blacked out* rather than silently left showing. What the page view shows is
+  exactly what the PDF will carry, so look at it before you share.
+
+[0.2.0](../../releases/tag/v0.2.0-beta) brought the multilingual model, classification and
+projects; each release's notes are on its [release page](../../releases).
 
 ## Links
 
@@ -75,7 +77,7 @@ npm install
 ./scripts/fetch-resources.sh      # downloads the 4 bundled files; LFM_GGUF=/path to use a local gguf
 npm run tauri dev                 # not `npm run dev` — that has no Tauri runtime
 npm run build                     # installers; add `-- --bundles app` to skip the dmg step
-npm test                          # prompt contract self-check
+npm test                          # prompt contract + redaction self-checks
 ```
 
 ## How it works
@@ -92,6 +94,16 @@ npm test                          # prompt contract self-check
   postcode as a phone number, while the Italian schema returned every field correctly.
 - **Streams the JSON**, points values back at the page on hover, and flags values that appear
   nowhere on the page as likely inventions.
+- **Hides what you tell it to.** A field's eye replaces its value with `[REDACTED]` in the JSON
+  and the text, and paints it black on the page and in the exported PDF.
+- **Projects.** Documents live in folders. A folder carries the language its documents are
+  written in and the classes they can be given, so it decides what a new document in it starts
+  from: a folder of Italian invoices and a folder of German forms want neither the same schema nor
+  the same class list. Group and sort a folder by class from the filter in the rail.
+- **Two languages, two different questions.** The interface speaks English or Italian. The
+  documents can be in any of the model's eight, and that is the one that matters: keys,
+  descriptions and class names go into the prompt in the document's language, because that is how
+  the model was trained.
 - Decoding (temperature, top-k/p, max tokens, seed) is configurable; temperature 0 by default.
 
 The published F1 assumes the model is told which fields the document contains — *you* supply that
@@ -146,13 +158,19 @@ guaranteed — 3 of 785 val outputs did not parse, and the app recovers pairs fr
 A right-looking value in the wrong field is not flagged. The twelve classes are heuristic, read off
 page titles rather than annotated, and English classification leans almost entirely on generated
 pages. Portuguese and English are the weakest languages. macOS builds are unsigned; history is
-capped at 50 docs storing pages as base64.
+capped at 50 docs storing pages as base64. Hiding is only as good as the extracted value: it
+blacks out that text where it occurs, so a value the model got wrong is flagged, not hidden. The
+box is placed from each word's position (the OCR's own character columns, or the PDF's own font)
+and padded outward, so it can take a letter of the label beside it; a line with no word positions
+— a document read by an older version, or a line the OCR misread — is blacked out whole.
 
 ## Next Steps
 - [x] Refine the finetuning with more data
 - [x] Check multilinguality still holds (italian will remain the central scope though)
 - [x] Add Document Classification pipeline
-- [ ] Add PII pipeline
+- [x] Add PII pipeline — hide an extracted value in the JSON, the text and the PDF (0.3.0)
+  - [ ] Train a dedicated PII model, so personal data is found and hidden without a schema field
+    for each kind of it
 - [ ] Detect the document's language instead of being told it
 - [ ] Re-classify on demand, not only on open
 - [ ] Move documents between projects, and open a whole folder at once

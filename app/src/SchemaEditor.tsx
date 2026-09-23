@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { CaretDown, Check, Plus, Question, Trash, Warning } from "@phosphor-icons/react";
+import { CaretDown, Check, Eye, EyeSlash, Plus, Question, Trash, Warning } from "@phosphor-icons/react";
 import { useT } from "./i18n";
 import type { Field } from "./types";
 
@@ -69,7 +69,8 @@ export default function SchemaEditor({
    */
   function pick(key: string) {
     const i = fields.findIndex((f) => f.key === key);
-    if (i >= 0) set(i, { key, description: known[key] });
+    // Only the description is restored: a closed eye stays closed.
+    if (i >= 0) set(i, { ...fields[i], description: known[key] });
     else onChange([...fields, { key, description: known[key] }]);
   }
 
@@ -79,10 +80,13 @@ export default function SchemaEditor({
       if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
         throw new Error(t.expectedObject);
       }
+      // A key that survives the paste keeps its eye: replacing the wording of
+      // a schema is not a decision to stop hiding what it finds.
       onChange(
         Object.entries(obj as Record<string, unknown>).map(([key, d]) => ({
           key,
           description: String(d),
+          ...(fields.find((f) => f.key === key)?.hidden && { hidden: true }),
         })),
       );
       setMenu("");
@@ -195,7 +199,20 @@ export default function SchemaEditor({
 
       <div className="field-list">
         {fields.map((f, i) => (
-          <div className="field" key={i}>
+          <div className={kind === "field" ? "field with-eye" : "field"} key={i}>
+            {/* The same eye as on an extracted value, so it can be closed before
+                a batch is run rather than after each document. */}
+            {kind === "field" && (
+              <button
+                className={f.hidden ? "icon-btn eye closed" : "icon-btn eye"}
+                aria-label={shared.hideValue(f.key.trim() === "" ? t.theRow : f.key)}
+                aria-pressed={f.hidden === true}
+                data-hint={f.hidden ? shared.hiddenHelp : shared.hideValue(f.key.trim() === "" ? t.theRow : f.key)}
+                onClick={() => set(i, { ...f, hidden: !f.hidden })}
+              >
+                {f.hidden ? <EyeSlash size={14} weight="regular" /> : <Eye size={14} weight="regular" />}
+              </button>
+            )}
             <div className="field-body">
               <input
                 className="k"

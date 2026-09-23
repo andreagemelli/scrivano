@@ -31,7 +31,7 @@ says so in a banner if you end up there.
 ```bash
 npm run build                    # installers under src-tauri/target/release/bundle/
 npm run build -- --bundles app   # .app only, skips the dmg step
-npm test                         # prompt contract self-check
+npm test                         # prompt contract + redaction self-checks
 cargo test --manifest-path src-tauri/Cargo.toml   # end-to-end decode + OCR, needs the resources
 ```
 
@@ -50,14 +50,16 @@ cargo test --manifest-path src-tauri/Cargo.toml   # end-to-end decode + OCR, nee
 | `src/Menu.tsx` | The app's own dropdown, over the same popover the schema presets use. Replaced the two native `<select>`s, which were the only controls the OS drew for itself. |
 | `src/Hints.tsx` | Tooltips. WKWebView draws no `title`, so every explanation in the app was invisible in the shipped build until this existed. |
 | `src/pdf.ts` | Rendering, text-layer extraction, line merging, the OCR fallback. |
+| `src/redact.ts` | Hiding a value: finding it on the page, masking it in the text and the JSON, placing its box on the image, and writing the PDF by hand from the painted page images. |
+| `src/redact.test.ts` | The check that keeps a hidden value hidden, including the PDF's byte offsets. |
 | `src/App.tsx` | Shell, document state, the extraction run and the tok/s measurement. |
 | `src/Logo.tsx` | The mark. Same geometry as `icons/scrivano.svg`; edit both together. |
 | `src-tauri/src/llm.rs` | llama.cpp decode loop and the sampler chain. |
 | `src-tauri/src/ocr.rs` | PP-OCRv5 through `oar-ocr`, boxes normalised to 0..1. |
 | `scripts/ui-shots.mjs` | Screenshots of every UI state in WebKit, by faking `window.__TAURI_INTERNALS__`. Needs `npm i -D --no-save playwright`; not part of `npm test`. |
 
-The UI is Italian. Field descriptions and the system prompt are not — they are what the model was
-fine-tuned on.
+The UI is English or Italian. Field descriptions and class names are written in the document's
+language, and the system prompt in English — that is what the model was fine-tuned on.
 
 ## Icons
 
@@ -83,6 +85,6 @@ Fetched by the script, not committed:
 | `det.onnx` | 4.6 MiB | text detection |
 | `rec.onnx` | 7.7 MiB | Latin text recognition |
 | `dict.txt` | 2.6 KiB | recognition character set |
-| `model.gguf` | 219 MiB | the extraction model, Q4_K_M |
+| `model.gguf` | 362 MiB | the extraction model, Q8_0 |
 
-The GGUF dominates the installer. Expect a bundle around 280 MB.
+The GGUF dominates the installer. Expect a bundle around 420 MB.

@@ -18,7 +18,7 @@
  *   node scripts/ui-shots.mjs chromium   # the other engine, for comparison
  */
 import { spawn, execFileSync } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,6 +63,9 @@ const FIXTURES = [
       ["Telefono", "0575 900123"],
       ["Email", "l.valle@example.it"],
     ],
+    // One OCR region holding a label and values together, so hiding a value
+    // has to black out part of a line rather than all of it.
+    sentence: "La sottoscritta VALLE LUISA, codice fiscale VLALSU77T62G999K, dichiara di risiedere qui.",
     answer: {
       nome: "LUISA",
       cognome: "VALLE",
@@ -148,6 +151,13 @@ function installBackend({ fixtures, seed }) {
     c.fillText(fixture.subtitle, 64, 98);
 
     const boxes = [];
+    /** One run per word, in the font just set, as ocr.rs reports them from CTC. */
+    const words = (text, x0) =>
+      [...text.matchAll(/\S+/g)].map((m) => ({
+        at: m.index,
+        x: (x0 + c.measureText(text.slice(0, m.index)).width) / W,
+        w: c.measureText(m[0]).width / W,
+      }));
     let y = 196;
     for (const [label, value] of fixture.rows) {
       c.fillStyle = "#6b7280";
@@ -156,6 +166,9 @@ function installBackend({ fixtures, seed }) {
       c.fillStyle = "#111827";
       c.font = "500 20px -apple-system, Helvetica, sans-serif";
       c.fillText(value, 360, y);
+      // Measured, not guessed: a box narrower than its ink would make a
+      // blacked-out value look leaky in a way the real OCR boxes are not.
+      const valueWidth = c.measureText(value).width;
       c.strokeStyle = "#e5e7eb";
       c.lineWidth = 1;
       c.beginPath();
@@ -166,9 +179,21 @@ function installBackend({ fixtures, seed }) {
       boxes.push({ text: label, box: { x: 64 / W, y: (y - 18) / H, w: 260 / W, h: 26 / H } });
       boxes.push({
         text: value,
-        box: { x: 360 / W, y: (y - 20) / H, w: Math.min(560, value.length * 12) / W, h: 28 / H },
+        box: { x: 360 / W, y: (y - 20) / H, w: Math.min(560, valueWidth + 4) / W, h: 28 / H },
+        runs: words(value, 360),
       });
       y += 62;
+    }
+    if (fixture.sentence) {
+      c.fillStyle = "#111827";
+      c.font = "18px -apple-system, Helvetica, sans-serif";
+      c.fillText(fixture.sentence, 64, y + 10);
+      const w = c.measureText(fixture.sentence).width;
+      boxes.push({
+        text: fixture.sentence,
+        box: { x: 60 / W, y: (y - 10) / H, w: (w + 8) / W, h: 28 / H },
+        runs: words(fixture.sentence, 64),
+      });
     }
     c.fillStyle = "#9ca3af";
     c.font = "16px -apple-system, Helvetica, sans-serif";
@@ -255,6 +280,14 @@ function installBackend({ fixtures, seed }) {
         return text;
       }
       case "plugin:clipboard-manager|write_text":
+        window.__clipboard = args.text;
+        return null;
+      // What leaves the app is kept, so the run can check it for hidden values.
+      case "plugin:dialog|save":
+        return "/Users/you/Documents/export.pdf";
+      case "plugin:fs|write_file":
+        // The body arrives as whatever the api layer made of the Uint8Array.
+        window.__written = Array.from(args instanceof ArrayBuffer ? new Uint8Array(args) : new Uint8Array(args.buffer ?? args));
         return null;
       default:
         // Loud on purpose: a command nobody stubbed would otherwise resolve to
@@ -366,6 +399,39 @@ async function checkUpgrade(browser, url) {
   await ctx.close();
 }
 
+/**
+ * What leaves the app with two values hidden: the copied text and the JSON must
+ * not contain them, and the PDF must hold no text at all. The PDF is written to
+ * docs/shots so it can be opened and looked at.
+ */
+async function checkHidden(page) {
+  const hidden = ["VALLE", "VLALSU77T62G999K"];
+  // The page on screen is the painted one, not the original under an overlay.
+  const src = await page.locator(".page-img").first().getAttribute("src");
+  if (!src?.startsWith("blob:")) throw new Error(`the page view shows the unpainted image (${src?.slice(0, 30)})`);
+  await page.getByRole("button", { name: /Copy the document text/ }).click();
+  const text = await page.evaluate(() => window.__clipboard);
+  await page.getByRole("button", { name: /Copy the JSON/ }).click();
+  const json = await page.evaluate(() => window.__clipboard);
+  for (const v of hidden) {
+    if (text.includes(v)) throw new Error(`copied text still carries ${v}`);
+    if (json.includes(v)) throw new Error(`copied JSON still carries ${v}`);
+  }
+  if (!text.includes("[REDACTED]")) throw new Error("copied text has no mask in it");
+  await page.getByRole("button", { name: /Download the document as a PDF/ }).click();
+  await page.waitForFunction(() => window.__written, null, { timeout: 15000 });
+  const bytes = Uint8Array.from(await page.evaluate(() => window.__written));
+  if (bytes.length < 1000) throw new Error(`the PDF is ${bytes.length} bytes`);
+  await writeFile(resolve(OUT, "hidden.pdf"), bytes);
+  const size = bytes.length;
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // pdf.js takes ownership of the buffer, so `bytes` is empty after this.
+  const pdf = await getDocument({ data: bytes, verbosity: 0 }).promise;
+  const items = (await (await pdf.getPage(1)).getTextContent()).items.length;
+  if (items !== 0) throw new Error(`the PDF carries a text layer (${items} items)`);
+  console.log(`  hidden check: text and JSON masked, PDF ${size} bytes with no text layer`);
+}
+
 async function run() {
   await rm(OUT, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
@@ -388,6 +454,8 @@ async function run() {
       const ctx = await browser.newContext({ viewport: WIDE, colorScheme: scheme, deviceScaleFactor: 2 });
       const page = await ctx.newPage();
       page.on("pageerror", (e) => console.error(`  [${scheme}] page error:`, e.message));
+      // The app catches most backend errors, so without this they never surface.
+      page.on("console", (m) => m.type() === "error" && console.error(`  [${scheme}] console:`, m.text()));
       await page.addInitScript(installBackend, { fixtures: FIXTURES });
       await page.goto(url);
       await page.waitForSelector(".app");
@@ -413,8 +481,28 @@ async function run() {
       await page.getByRole("button", { name: /^Fields$/ }).click();
       await shot(page, `05-result-fields-${scheme}`);
 
+      // Hiding a value: the eye on two fields, and then the page, the JSON and
+      // the text must all say the same thing — the value is gone.
+      for (const key of ["cognome", "codice-fiscale"]) {
+        await page.locator(".frow", { hasText: key }).locator(".eye").click();
+      }
+      await shot(page, `18-hidden-fields-${scheme}`);
+      await page.getByRole("button", { name: /^JSON$/ }).click();
+      await shot(page, `19-hidden-json-${scheme}`);
+      await page.locator(".doc-pane .seg button", { hasText: /^Text$/ }).click();
+      await shot(page, `20-hidden-text-${scheme}`);
+      await page.locator(".doc-pane .seg button", { hasText: /^Page$/ }).click();
+      if (scheme === "light") await checkHidden(page);
+      await page.getByRole("button", { name: /^Fields$/ }).click();
+
       await openDoc(page, 2);
       await shot(page, `06-rail-recent-${scheme}`);
+      // The new documents inherit the closed eyes, and there is no extraction
+      // yet to take the values from: exporting them must be refused, and said.
+      if (scheme === "light") {
+        const refused = await page.locator(".doc-pane .icon-btn[aria-disabled='true']").count();
+        if (refused !== 2) throw new Error(`expected both document exports refused before extraction, got ${refused}`);
+      }
 
       await pickMenu(page, ".rail-top .menu", /class|classe/i);
       await shot(page, `07-rail-grouped-${scheme}`);
