@@ -10,6 +10,8 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { readDir } from "@tauri-apps/plugin-fs";
+import { sep } from "@tauri-apps/api/path";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { backendStatus, detectLang, extract, inTauri } from "./api";
 import { loadPages } from "./pdf";
@@ -46,6 +48,9 @@ import type { Doc, DocLang, Field, Lang, Page, Project, Sampling, Status } from 
 const noop = () => {};
 
 const EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp", "tif", "tiff"];
+
+/** Folders on disk that are documents to macOS, and not folders of documents. */
+const PACKAGES = ["rtfd", "pages", "key", "numbers", "app", "bundle"];
 
 /** Same array identity on every render, so the store effect can tell "not touched yet". */
 const INITIAL: Doc[] = [];
@@ -131,7 +136,9 @@ function railFromSession(): boolean {
 export default function App() {
   const [docs, setDocs] = useState<Doc[]>(INITIAL);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [progress, setProgress] = useState("");
+  // What each document still being read is doing, by id: a batch reads one
+  // file while another is on screen, and one shared line showed the wrong one's.
+  const [progress, setProgress] = useState<Record<string, string>>({});
   const [stream, setStream] = useState("");
   // Live decode rate of the run in flight, or null between runs. A finished run
   // keeps its rate on the document instead, so history still reports it.
@@ -394,17 +401,71 @@ export default function App() {
   const patch = (id: string, p: Partial<Doc>) =>
     setDocs((ds) => ds.map((d) => (d.id === id ? { ...d, ...p } : d)));
 
-  async function addPath(path: string) {
+  /**
+   * Files and folders, as picked or dropped, opened one after another: the
+   * model runs one thing at a time anyway, and forty files read at once would
+   * hold forty rendered PDFs in memory. A folder opens the documents directly in
+   * it — not its subfolders, not its hidden files — in name order. The first one
+   * is shown; the rest read behind it.
+   */
+  async function addPaths(paths: string[]) {
+    // Where the whole pick or drop goes, and what it starts from, fixed now:
+    // switching folders while the fifth file of twenty reads must not send the
+    // other fifteen somewhere else.
+    const into = opening.current.project.id;
+    const start = newDocDefaults.current;
+    const files: string[] = [];
+    let failed = "";
+    for (const path of paths) {
+      if (accepted(path)) {
+        files.push(path);
+        continue;
+      }
+      // A document package (an .rtfd, a Pages file) is a folder on disk, but
+      // its insides are attachments and previews, not documents of its own.
+      if (PACKAGES.includes(path.split(".").pop()?.toLowerCase() ?? "")) continue;
+      try {
+        const base = path.endsWith(sep()) ? path : path + sep();
+        const names = (await readDir(path))
+          .filter((e) => e.isFile && !e.name.startsWith(".") && accepted(e.name))
+          .map((e) => e.name)
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        files.push(...names.map((n) => base + n));
+      } catch (e) {
+        // "Not a directory" is a file of another type, which the message below
+        // covers. Anything else — a folder that cannot be listed — is the
+        // reason nothing opened, so it is the thing to say.
+        const why = message(e);
+        if (!/os error (20|267)\b/.test(why)) failed ||= why;
+        console.warn("nothing opened from", path, e);
+      }
+    }
+    setDropError(
+      files.length > 0 ? "" : failed ? words.current.readFailed(failed) : words.current.nothingToOpen(EXTENSIONS),
+    );
+    // Stamped a hair apart, newest first, so "most recent" still lists the
+    // folder in name order with the one on screen at the top.
+    const now = Date.now();
+    for (const [i, file] of files.entries()) await addPath(file, i === 0, into, start, now - i);
+  }
+
+  async function addPath(
+    path: string,
+    select = true,
+    into = opening.current.project.id,
+    draft = newDocDefaults.current,
+    addedAt = Date.now(),
+  ) {
     const id = crypto.randomUUID();
-    // The folder it opens into, fixed now: switching folders while it reads
-    // must not change which folder's rules it is classified by.
-    const { project: home } = opening.current;
-    const draft = newDocDefaults.current;
+    // The folder it opens into, looked up now: one deleted mid-batch sends the
+    // rest where its documents went. Fixed from here on, so switching folders
+    // while it reads does not change whose rules it is classified by.
+    const home = projectsNow.current.find((p) => p.id === into) ?? projectsNow.current[0];
     setDocs((ds) => [
       {
         id,
         name: path.split(/[\\/]/).pop() ?? path,
-        addedAt: Date.now(),
+        addedAt,
         pages: [],
         fields: withEyes(draft.fields, draft.lang, shutRef.current),
         sampling: draft.sampling,
@@ -413,16 +474,17 @@ export default function App() {
       },
       ...ds,
     ]);
-    setActiveId(id);
-    setProgress(words.current.readingFile);
+    if (select) setActiveId(id);
+    const say = (text: string) => setProgress((p) => ({ ...p, [id]: text }));
+    say(words.current.readingFile);
     let pages;
     try {
-      pages = await loadPages(path, setProgress, words.current);
+      pages = await loadPages(path, say, words.current);
     } catch (e) {
       patch(id, { status: "failed", error: message(e) });
       return;
     } finally {
-      setProgress("");
+      setProgress(({ [id]: _, ...rest }) => rest);
     }
     // The page says what language it is in, and that decides the language of
     // everything the model is shown for it. Read against the document as it is
@@ -501,7 +563,7 @@ export default function App() {
    * Ask again, by hand: after the folder's class list changed, or the page's
    * language did. With the folder's list as it is now, in `lang` if given.
    */
-  async function reclassify(id: string, lang?: DocLang) {
+  async function reclassify(id: string, lang?: DocLang, into?: Project) {
     const d = docsNow.current.find((x) => x.id === id);
     if (!d) return;
     if (d.status === "reading" || d.status === "classifying" || d.status === "extracting") {
@@ -509,7 +571,8 @@ export default function App() {
       owed.current.add(id);
       return;
     }
-    const home = projectsNow.current.find((p) => p.id === projectOf(d)) ?? projectsNow.current[0];
+    // `into`: a folder it is being moved to, which the last render cannot know yet.
+    const home = into ?? projectsNow.current.find((p) => p.id === projectOf(d)) ?? projectsNow.current[0];
     await classifyDoc(id, d.pages, home, lang ?? d.docLang ?? home.docLang, true);
   }
 
@@ -534,6 +597,9 @@ export default function App() {
     try {
       for (const [i, id] of ids.entries()) {
         setSweep({ projectId, done: i, of: ids.length });
+        // Moved out since the sweep began: another folder's rules, not this one's.
+        const d = docsNow.current.find((x) => x.id === id);
+        if (!d || projectOf(d) !== projectId) continue;
         await reclassify(id);
       }
     } finally {
@@ -547,18 +613,25 @@ export default function App() {
     let gone = false;
     // Outside Tauri there is no webview to subscribe to, and getCurrentWebview
     // throws rather than rejecting, so the guard has to be a try.
+    // A drag that starts inside the page — an image, a selection — arrives
+    // here too on macOS, with no paths. It is not a file drop, and treating it
+    // as one lit the drop overlay and then reported an unsupported file.
+    let external = false;
     try {
       void getCurrentWebview()
         .onDragDropEvent((e) => {
+          if (e.payload.type === "enter") external = e.payload.paths.length > 0;
+          if (!external) return;
           if (e.payload.type === "enter" || e.payload.type === "over") {
             setDragging(true);
             return;
           }
           setDragging(false);
+          external = false;
           if (e.payload.type !== "drop") return;
-          const path = e.payload.paths.find(accepted);
-          setDropError(path ? "" : words.current.unsupported(EXTENSIONS));
-          if (path) void addPath(path);
+          // Every file and folder dropped, not only the first: a folder's
+          // worth of scans dragged in at once is the case this is for.
+          void addPaths(e.payload.paths);
         })
         .then((un) => {
           if (gone) un();
@@ -576,18 +649,49 @@ export default function App() {
   async function pickDocument() {
     // Without this the dialog rejection is unhandled and the button looks dead.
     try {
-      const path = await open({
-        multiple: false,
+      const paths = await open({
+        multiple: true,
         filters: [{ name: t.documentsFilter, extensions: EXTENSIONS }],
       });
-      if (typeof path === "string") {
-        setDropError("");
-        await addPath(path);
-      }
+      if (paths && paths.length > 0) await addPaths(paths);
     } catch (e) {
       console.error("file dialog failed", e);
       setDropError(inTauri ? t.pickerFailed(message(e)) : t.noTauri);
     }
+  }
+
+  /** A folder, for the documents in it. The dialog grants reading it; nothing wider. */
+  async function pickFolder() {
+    try {
+      const dir = await open({ directory: true });
+      if (typeof dir === "string") await addPaths([dir]);
+    } catch (e) {
+      console.error("folder dialog failed", e);
+      setDropError(inTauri ? t.pickerFailed(message(e)) : t.noTauri);
+    }
+  }
+
+  /**
+   * A document into another folder, where that folder's rules apply. Its class
+   * came from the old folder's list — a tag from another vocabulary — so it is
+   * asked again when the new folder classifies and dropped when it does not,
+   * unless the two lists are the same list. Its language stays what the page
+   * was read in, whichever folder it sits in.
+   */
+  function moveDocument(id: string, to: string) {
+    const d = docs.find((x) => x.id === id);
+    const from = d && projects.find((p) => p.id === projectOf(d));
+    const target = projects.find((p) => p.id === to);
+    if (!d || !from || !target || from.id === to) return;
+    const sameList = target.docLang === from.docLang && samePreset(target.classes, from.classes);
+    patch(id, {
+      projectId: to,
+      ...(d.docLang === undefined && from.docLang !== target.docLang && { docLang: from.docLang }),
+      ...(!sameList && { docClass: undefined }),
+    });
+    // It has left the folder on screen, so it cannot stay the one shown.
+    if (id === activeId) setActiveId(null);
+    if (!sameList && target.classify) void reclassify(id, d.docLang ?? from.docLang, target);
   }
 
   function removeDocument(id: string) {
@@ -821,16 +925,19 @@ export default function App() {
             onToggle={toggleRail}
             onSelect={setActiveId}
             onAdd={pickDocument}
+            onAddFolder={pickFolder}
+            onMove={moveDocument}
             onDelete={removeDocument}
           />
 
           <main className="stage">
             <DocumentPane
               doc={doc}
-              progress={progress}
+              progress={(activeId && progress[activeId]) || ""}
               dragging={dragging}
               dropError={dropError}
               highlight={highlight}
+              onAddFolder={pickFolder}
               spans={located.spans}
               hiddenCount={hiding.length - located.missing.length}
               notFound={located.missing.length}

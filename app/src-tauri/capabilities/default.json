@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Window dragging, local file picking, history store, clipboard, saving results as JSON, and saving a redacted copy of a document as PDF.",
+  "description": "Window dragging, local file and folder picking, history store, clipboard, saving results as JSON, and saving a redacted copy of a document as PDF.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,6 +10,7 @@
     "dialog:allow-save",
     "fs:default",
     "fs:allow-read-file",
+    "fs:allow-read-dir",
     "fs:allow-write-text-file",
     "fs:allow-write-file",
     "store:default",

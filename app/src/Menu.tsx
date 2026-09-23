@@ -20,6 +20,7 @@ export default function Menu<T extends string>({
   hint,
   icon,
   align = "left",
+  disabled,
 }: {
   value: T;
   choices: Choice<T>[];
@@ -30,9 +31,19 @@ export default function Menu<T extends string>({
   /** Given, the trigger is this icon alone: the menu is the label. */
   icon?: ReactNode;
   align?: "left" | "right";
+  /** Why it cannot open right now. Shown as its hint; absent means it can. */
+  disabled?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+
+  // Inside a scrolling list — the rail — a menu on the last row opens below
+  // the fold. The popover already counts toward that list's scroll height, so
+  // bringing it into view is all it takes.
+  useEffect(() => {
+    if (open) pop.current?.scrollIntoView({ block: "nearest" });
+  }, [open]);
   const current = choices.find((c) => c.value === value);
 
   // A click anywhere else closes it. Blur alone is not enough: WebKit does not
@@ -62,9 +73,10 @@ export default function Menu<T extends string>({
         className={icon ? "icon-btn" : "menu-btn"}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
-        data-hint={hint}
-        onClick={() => setOpen((o) => !o)}
+        aria-label={disabled || label}
+        aria-disabled={disabled ? true : undefined}
+        data-hint={disabled || hint}
+        onClick={() => !disabled && setOpen((o) => !o)}
       >
         {icon ?? (
           <>
@@ -74,7 +86,7 @@ export default function Menu<T extends string>({
         )}
       </button>
       {open && (
-        <div className="popover" role="listbox" aria-label={label}>
+        <div className="popover" role="listbox" aria-label={label} ref={pop}>
           <div className="poplist">
             {choices.map((c) => (
               <button

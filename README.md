@@ -12,7 +12,7 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 > **The project born as a toy excercise for finetuning and extending LFM-2.5-350M for italian and KIE. I am now having fun adding new capabilities!**
 
-![beta](https://img.shields.io/badge/release-0.5.0--beta-1d4ed8)
+![beta](https://img.shields.io/badge/release-0.6.0--beta-1d4ed8)
 ![macOS](https://img.shields.io/badge/macOS-supported-informational)
 ![Windows](https://img.shields.io/badge/Windows-supported-informational)
 ![licence](https://img.shields.io/badge/licence-CC%20BY--NC--SA%204.0-lightgrey)
@@ -21,29 +21,26 @@ A 350M model fine-tuned for the job, bundled in a desktop app.
 
 ![Scrivano: a residence declaration classified and extracted, with the folder it was filed in](docs/screenshot-app.png)
 
-## What is new in 0.5.0
+## What is new in 0.6.0
 
-**Classify again, when you ask.** The class used to be asked for once, the moment a document
-opened, and then never again — so editing a folder's class list changed nothing for the documents
-already in it, and a class no longer on the list stayed on them.
+**Documents move between projects, and a folder opens at once.**
 
-- **One document**: the arrows beside its class tag in the top bar ask again, with the folder's
-  list as it is now. A document with no class has a dashed *Classify* tag in the same place, even
-  in a folder that does not classify on open.
-- **A whole folder**: *Classify all … again* in the folder's settings goes through its documents
-  one after another and says how far it has got. A document busy with a run of its own is asked
-  again as soon as it is free.
-- **Correcting a document's language** asks again by itself, whenever that changes what the model
-  is shown: its class had been chosen from a list in the language it was thought to be in.
-- A document that was already extracted stays *Done* after it is classified again, and a failed
-  run keeps the class it had.
+- **Move to another project** from the folders icon on a document in the list. It takes on its new
+  folder's rules: a class from the old folder's list is asked again when the new folder classifies
+  (and dropped when it does not), unless the two lists are the same list; the language the page was
+  read in stays with it. A document still working — reading, classifying, extracting — can be
+  moved once it has finished, so it is never classified by the folder it just left.
+- **Open a whole folder**: *Choose a folder*, the folder icon beside **+**, or drop the folder on the
+  window. Every document directly in it opens, in name order — not its subfolders, not hidden
+  files, not the `.txt` beside them — one after another, with the first one on screen while the rest
+  read behind it.
+- **Several files at once**, from *Choose files* or dropped together; a drop used to open only the
+  first of them.
+- A drag that starts inside the window — an image, a selection — no longer lights the drop overlay
+  and reports an unsupported file.
 
-Under the hood, each model run now streams its tokens on a channel of its own rather than an
-app-wide event, so a classification asked for during an extraction cannot leak its tokens into the
-extraction's live view.
-
-[0.4.0](../../releases/tag/v0.4.0-beta) brought language detection; each release's notes are on
-its [release page](../../releases).
+[0.5.0](../../releases/tag/v0.5.0-beta) brought classifying again on demand; each release's notes
+are on its [release page](../../releases).
 
 ## Links
 
@@ -85,7 +82,7 @@ npm test                          # prompt contract + redaction self-checks
 
 ## How it works
 
-- **Reads** `pdf png jpg jpeg webp tif tiff`. PDFs render at 200 DPI; a page's text layer is used
+- **Reads** `pdf png jpg jpeg webp tif tiff`, one file, several, or a whole folder at once. PDFs render at 200 DPI; a page's text layer is used
   directly when it yields >50 chars, else OCR (PP-OCRv5 + Latin recognition, Rust/ONNX).
 - **Detects the language, then classifies.** As soon as the text is in, the page's language is read
   off it, then one of twelve classes is asked for, in that language. The class list belongs to the
@@ -165,7 +162,8 @@ guaranteed — 3 of 785 val outputs did not parse, and the app recovers pairs fr
 A right-looking value in the wrong field is not flagged. The twelve classes are heuristic, read off
 page titles rather than annotated, and English classification leans almost entirely on generated
 pages. Portuguese and English are the weakest languages. macOS builds are unsigned; history is
-capped at 50 docs storing pages as base64. Hiding is only as good as the extracted value: it
+capped at 50 docs storing pages as base64 — open a folder of more and only the 50 most recent are
+kept between launches. Hiding is only as good as the extracted value: it
 blacks out that text where it occurs, so a value the model got wrong is flagged, not hidden. The
 box is placed from each word's position (the OCR's own character columns, or the PDF's own font)
 and padded outward, so it can take a letter of the label beside it; a line with no word positions
@@ -180,7 +178,7 @@ and padded outward, so it can take a letter of the label beside it; a line with 
     for each kind of it
 - [x] Detect the document's language instead of being told it (0.4.0)
 - [x] Re-classify on demand, not only on open (0.5.0)
-- [ ] Move documents between projects, and open a whole folder at once
+- [x] Move documents between projects, and open a whole folder at once (0.6.0)
 
 ## Licence
 
